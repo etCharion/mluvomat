@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parlamentní Pořadník</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <style>
+        html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; }
+        body { font-family: 'Inter', sans-serif; display: flex; flex-direction: column; }
+        #app { width: 100%; max-width: 1400px; margin-left: auto; margin-right: auto; padding: 1rem; flex-grow: 1; display: flex; flex-direction: column; }
+        .view { display: none; flex-grow: 1; }
+        .active-view { display: flex; flex-direction: column; }
+        .scrollable-list-container { display: flex; flex-direction: column; min-height: 0; flex-grow: 1; }
+        .scrollable-list { overflow-y: auto; flex-grow: 1; }
+        .timer-ring { stroke-dasharray: 283; stroke-dashoffset: 283; transition: stroke-dashoffset 0.2s linear; }
+        #timer-display { touch-action: none; cursor: grab; }
+        input[type="color"] { -webkit-appearance: none; border: none; width: 32px; height: 32px; border-radius: 8px; cursor: pointer; }
+        input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+        input[type="color"]::-webkit-color-swatch { border: 1px solid #ccc; border-radius: 8px; }
+        .setting-item.dragging { opacity: 0.5; }
+        /* Corrected Toggle Switch Styles */
+        .toggle-checkbox:checked + .toggle-label .dot { transform: translateX(1.5rem); }
+        .toggle-checkbox:checked + .toggle-label { background-color: #48BB78; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <div id="app">
+        <!-- Auth Section -->
+        <div id="auth-section" class="text-center p-8 bg-white rounded-lg shadow-md m-auto">
+            <h1 class="text-3xl font-bold mb-4">Parlamentní Pořadník</h1>
+            <div class="flex items-center justify-center text-gray-600"><i class="fa-solid fa-spinner fa-spin mr-3"></i><span>Připojování...</span></div>
+        </div>
+
+        <!-- Main Content -->
+        <div id="main-content" class="hidden flex flex-col flex-grow">
+            <header class="bg-white rounded-lg shadow-md p-4 mb-8 flex-shrink-0">
+                <div class="flex flex-wrap justify-between items-center gap-4">
+                    <div>
+                        <h1 class="text-2xl font-bold text-blue-700">Studentský Parlament</h1>
+                        <p id="user-info" class="text-xs text-gray-400 font-mono"></p>
+                    </div>
+                    <nav class="flex flex-wrap gap-2">
+                        <button data-view="presenter" class="nav-btn px-3 py-2 rounded-md text-gray-700 hover:bg-blue-100">Prezentace</button>
+                        <button data-view="speaker" class="nav-btn px-3 py-2 rounded-md text-gray-700 hover:bg-blue-100">Přihlášení</button>
+                        <button data-view="admin" class="nav-btn px-3 py-2 rounded-md text-gray-700 hover:bg-blue-100">Administrace</button>
+                    </nav>
+                </div>
+            </header>
+
+            <!-- Presenter View -->
+            <div id="presenter-view" class="view p-4 md:p-8 bg-white rounded-lg shadow-md flex-grow">
+                <div class="grid md:grid-cols-3 gap-8 h-full">
+                    <div class="md:col-span-2 bg-gray-100 p-8 rounded-lg text-center flex flex-col">
+                        <h2 id="current-speaker-title" class="text-2xl font-semibold text-gray-500 mb-4">Právě mluví</h2>
+                        <p id="current-speaker-name" class="text-5xl font-bold text-blue-700 break-words">- Nikdo -</p>
+                        <div id="timer-display" class="relative w-48 h-48 mx-auto my-6"><svg class="w-full h-full" viewBox="0 0 100 100"><circle class="text-gray-300" stroke-width="8" stroke="currentColor" fill="transparent" r="45" cx="50" cy="50" /><circle id="timer-ring-circle" class="timer-ring text-blue-600" stroke-width="8" stroke-linecap="round" stroke="currentColor" fill="transparent" r="45" cx="50" cy="50" transform="rotate(-90 50 50)" /></svg><span id="time-left" class="absolute inset-0 flex items-center justify-center text-4xl font-mono font-bold">00:00</span></div>
+                        <div class="flex justify-center space-x-4"><button id="start-timer-btn" class="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg font-semibold disabled:bg-gray-400"><i class="fa-solid fa-play mr-2"></i>Start</button><button id="pause-timer-btn" class="bg-yellow-500 hover:bg-yellow-600 text-white px-6 py-2 rounded-lg font-semibold disabled:bg-gray-400"><i class="fa-solid fa-pause mr-2"></i>Pauza</button><button id="reset-timer-btn" class="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg font-semibold"><i class="fa-solid fa-sync mr-2"></i>Reset</button></div>
+                    </div>
+                    <div class="bg-gray-100 p-6 rounded-lg flex flex-col">
+                        <h2 class="text-xl font-semibold text-gray-500 mb-4 text-center flex-shrink-0">Další na řadě</h2>
+                        <div class="scrollable-list-container flex-grow">
+                             <ul id="speaker-queue-list" class="space-y-3 scrollable-list pr-2"></ul>
+                        </div>
+                        <div id="queue-summary" class="mt-4 pt-4 border-t border-gray-300 text-center text-sm text-gray-600 flex-shrink-0"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Speaker/User View -->
+            <div id="speaker-view" class="view p-8 bg-white rounded-lg shadow-md flex-grow items-center justify-center">
+                <div class="max-w-md w-full">
+                    <h2 class="text-2xl font-bold mb-6 text-center">Přihlásit se o slovo</h2>
+                    <div id="signup-form-container">
+                        <div class="mb-4"><label for="speaker-name" class="block text-gray-700 text-sm font-bold mb-2">Jméno a příjmení:</label><input type="text" id="speaker-name" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="Jan Novák"></div>
+                        <div class="mb-4"><label for="party-select" class="block text-gray-700 text-sm font-bold mb-2">Politická strana:</label><select id="party-select" class="shadow border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"></select></div>
+                        <div class="mb-6"><label for="contribution-type" class="block text-gray-700 text-sm font-bold mb-2">Typ příspěvku:</label><select id="contribution-type" class="shadow border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"></select></div>
+                        <button id="signup-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-transform transform hover:scale-105">Přihlásit se</button>
+                    </div>
+                     <div id="signups-disabled-message" class="hidden text-center p-4 bg-yellow-100 border border-yellow-300 rounded-lg">
+                        <i class="fa-solid fa-lock text-2xl text-yellow-600 mb-2"></i>
+                        <p class="font-semibold">Přihlašování je momentálně pozastaveno.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Admin View -->
+            <div id="admin-view" class="view p-8 bg-white rounded-lg shadow-md flex-grow">
+                 <div class="grid md:grid-cols-2 gap-8 h-full">
+                    <div class="bg-gray-50 p-6 rounded-lg flex flex-col">
+                        <h2 class="text-2xl font-bold mb-4 flex-shrink-0">Správa pořadníku</h2>
+                        <button id="next-speaker-btn" class="w-full mb-4 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg disabled:bg-gray-400 flex-shrink-0"><i class="fa-solid fa-arrow-right-to-bracket mr-2"></i> POSUNOUT DALŠÍHO</button>
+                        <div class="scrollable-list-container"><ul id="admin-speaker-list" class="space-y-2 scrollable-list pr-2"></ul></div>
+                    </div>
+                    <div class="bg-gray-50 p-6 rounded-lg flex flex-col min-h-0">
+                        <h2 class="text-2xl font-bold mb-4 flex-shrink-0">Nastavení</h2>
+                        <div class="mb-4 p-4 border rounded-lg bg-white flex-shrink-0">
+                            <label for="signups-enabled-toggle" class="flex items-center justify-between cursor-pointer">
+                                <span class="font-semibold text-gray-700">Povolit přihlašování</span>
+                                <div class="relative">
+                                    <input type="checkbox" id="signups-enabled-toggle" class="toggle-checkbox sr-only">
+                                    <div class="toggle-label block bg-gray-200 w-14 h-8 rounded-full"></div>
+                                    <div class="dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition-transform"></div>
+                                </div>
+                            </label>
+                        </div>
+                        <div class="scrollable-list-container"><div class="scrollable-list pr-2 space-y-4">
+                            <div class="collapsible-section">
+                                <button class="collapsible-trigger w-full text-left font-bold text-lg p-2 bg-white rounded-lg shadow flex justify-between items-center"><span>Typy příspěvků</span><i class="fa-solid fa-chevron-down transform"></i></button>
+                                <div class="collapsible-content space-y-3 mt-2">
+                                    <div class="mb-2 text-center text-xs text-gray-500">Přetáhnutím změňte prioritu (nejvyšší je dole).</div>
+                                    <div id="settings-list"></div>
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 border-t items-center flex-shrink-0"><input type="text" id="new-setting-name" placeholder="Název" class="md:col-span-2 shadow appearance-none border rounded w-full py-2 px-3 text-gray-700"><input type="number" id="new-setting-time" placeholder="Čas (s)" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700"><input type="color" id="new-setting-color" value="#FFFFFF" title="Vybrat barvu" class="shadow appearance-none border rounded w-full h-10"><button id="add-setting-btn" class="md:col-span-3 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Přidat typ</button></div>
+                                </div>
+                            </div>
+                            <div class="collapsible-section">
+                                <button class="collapsible-trigger w-full text-left font-bold text-lg p-2 bg-white rounded-lg shadow flex justify-between items-center"><span>Politické strany</span><i class="fa-solid fa-chevron-down transform"></i></button>
+                                <div class="collapsible-content space-y-3 mt-2 hidden">
+                                    <div id="parties-list"></div>
+                                    <div class="flex gap-4 p-4 border-t items-center"><input type="text" id="new-party-name" placeholder="Název strany" class="flex-grow shadow appearance-none border rounded w-full py-2 px-3 text-gray-700"><button id="add-party-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Přidat stranu</button></div>
+                                </div>
+                            </div>
+                        </div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="message-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"><div class="bg-white rounded-lg shadow-xl p-8 max-w-lg text-center"><p id="modal-text" class="mb-6 text-base text-left"></p><div class="flex justify-end gap-4"><button id="modal-close-btn" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded-lg">OK</button></div></div></div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, addDoc, deleteDoc, runTransaction, updateDoc, query, getDocs, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- Basic Setup ---
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        if (!firebaseConfig.apiKey) document.getElementById('auth-section').innerHTML = `<h1 class="text-2xl font-bold text-red-600 mb-4">Chyba Konfigurace</h1><p class="text-gray-600">Konfigurace Firebase nebyla nalezena.</p>`;
+        
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'parliament-app-default';
+
+        const configDocRef = doc(db, "artifacts", appId, "public/data/config", "main");
+        const queueRef = collection(db, "artifacts", appId, "public/data/queue");
+        
+        // --- Global State ---
+        let currentUser = null, timerInterval = null, timeRemaining = 0, totalTime = 0, isDraggingTimer = false, dbState = {};
+
+        // --- UI Element Query Selector ---
+        const $ = (selector) => document.querySelector(selector);
+        const $$ = (selector) => document.querySelectorAll(selector);
+
+        // --- UI Elements ---
+        const ui = {
+            authSection: $('#auth-section'), mainContent: $('#main-content'), userInfo: $('#user-info'), navBtns: $$('.nav-btn'),
+            views: { presenter: $('#presenter-view'), speaker: $('#speaker-view'), admin: $('#admin-view') },
+            speakerNameInput: $('#speaker-name'), contributionTypeSelect: $('#contribution-type'), partySelect: $('#party-select'), signupBtn: $('#signup-btn'),
+            adminSpeakerList: $('#admin-speaker-list'), nextSpeakerBtn: $('#next-speaker-btn'), settingsList: $('#settings-list'),
+            newSettingName: $('#new-setting-name'), newSettingTime: $('#new-setting-time'), newSettingColor: $('#new-setting-color'), addSettingBtn: $('#add-setting-btn'),
+            currentSpeakerTitle: $('#current-speaker-title'), currentSpeakerName: $('#current-speaker-name'), speakerQueueList: $('#speaker-queue-list'),
+            timeLeftDisplay: $('#time-left'), timerRingCircle: $('#timer-ring-circle'), timerDisplay: $('#timer-display'),
+            startTimerBtn: $('#start-timer-btn'), pauseTimerBtn: $('#pause-timer-btn'), resetTimerBtn: $('#reset-timer-btn'),
+            messageModal: $('#message-modal'), modalText: $('#modal-text'), modalCloseBtn: $('#modal-close-btn'),
+            signupsEnabledToggle: $('#signups-enabled-toggle'),
+            signupFormContainer: $('#signup-form-container'), signupsDisabledMessage: $('#signups-disabled-message'),
+            queueSummary: $('#queue-summary'),
+            partiesList: $('#parties-list'), newPartyNameInput: $('#new-party-name'), addPartyBtn: $('#add-party-btn'),
+        };
+
+        // --- Core Functions ---
+        const showModal = (message) => { ui.modalText.innerHTML = message; ui.messageModal.classList.remove('hidden'); };
+        ui.modalCloseBtn.addEventListener('click', () => ui.messageModal.classList.add('hidden'));
+        
+        const switchView = (viewName) => {
+            Object.values(ui.views).forEach(v => v.classList.remove('active-view'));
+            if(ui.views[viewName]) ui.views[viewName].classList.add('active-view');
+            ui.navBtns.forEach(b => b.classList.toggle('bg-blue-200', b.dataset.view === viewName));
+        };
+
+        const isColorDark = (hex) => {
+            const c = hex.substring(1), rgb = parseInt(c, 16), r = (rgb >> 16) & 0xff, g = (rgb >> 8) & 0xff, b = (rgb >> 0) & 0xff;
+            return (r * 0.299 + g * 0.587 + b * 0.114) < 186;
+        };
+        const darkenColor = (hex, percent) => {
+            let [r, g, b] = [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
+            r = Math.floor(r * (1 - percent)); g = Math.floor(g * (1 - percent)); b = Math.floor(b * (1 - percent));
+            return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+        };
+
+        // --- Timer and Queue Logic ---
+        const updateTimerDisplay = () => {
+            const minutes = Math.floor(timeRemaining / 60).toString().padStart(2, '0');
+            const seconds = (timeRemaining % 60).toString().padStart(2, '0');
+            ui.timeLeftDisplay.textContent = `${minutes}:${seconds}`;
+            ui.timerRingCircle.style.strokeDashoffset = 283 * (1 - (totalTime > 0 ? timeRemaining / totalTime : 0));
+        };
+
+        const resetTimer = async () => {
+            if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+            const speaker = dbState.state?.currentSpeaker;
+            const type = dbState.settings?.types.find(s => s.name === speaker?.type);
+            totalTime = type ? type.time : 0;
+            timeRemaining = totalTime;
+            await updateDoc(configDocRef, { "state.timer": { timeRemaining, totalTime, isRunning: false } });
+        };
+
+        const advanceToNextSpeaker = async () => {
+            if (isDraggingTimer) return;
+            try {
+                await runTransaction(db, async (t) => {
+                    const cfgDoc = await t.get(configDocRef);
+                    const settings = cfgDoc.data()?.settings || { types: [] };
+                    const qSnap = await getDocs(query(queueRef));
+                    let queue = qSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+                    queue.sort((a, b) => {
+                        const priorityA = settings.types.findIndex(s => s.name === a.type);
+                        const priorityB = settings.types.findIndex(s => s.name === b.type);
+                        if (priorityA !== priorityB) return priorityB - priorityA;
+                        return (a.timestamp?.toMillis() || 0) - (b.timestamp?.toMillis() || 0);
+                    });
+
+                    const next = queue.length > 0 ? queue[0] : null;
+                    const typeSetting = next ? settings.types.find(s => s.name === next.type) : null;
+                    const newTotalTime = typeSetting ? typeSetting.time : 0;
+
+                    t.update(configDocRef, { 
+                        "state.currentSpeaker": next ? { name: next.name, type: next.type, party: next.party } : null,
+                        "state.timer": { timeRemaining: newTotalTime, totalTime: newTotalTime, isRunning: false }
+                    });
+                    if (next) t.delete(doc(queueRef, next.id));
+                });
+            } catch (e) { console.error("Advance speaker transaction failed: ", e); showModal("Nepodařilo se přesunout řečníka."); }
+        };
+
+        // --- Rendering Functions ---
+        const renderQueue = (queue) => {
+            const settings = dbState.settings || { types: [] };
+            const sorted = [...queue].sort((a, b) => {
+                const priorityA = settings.types.findIndex(s => s.name === a.type);
+                const priorityB = settings.types.findIndex(s => s.name === b.type);
+                if (priorityA !== priorityB) return priorityB - priorityA; // Higher index = higher priority
+                return (a.timestamp?.toMillis() || 0) - (b.timestamp?.toMillis() || 0);
+            });
+
+            ui.adminSpeakerList.innerHTML = '';
+            ui.speakerQueueList.innerHTML = '';
+            let totalQueueTime = 0;
+
+            if (sorted.length === 0) {
+                const emptyMsg = '<li class="p-3 bg-white rounded-md shadow-sm text-center text-gray-500">Seznam je prázdný.</li>';
+                ui.adminSpeakerList.innerHTML = emptyMsg;
+                ui.speakerQueueList.innerHTML = emptyMsg;
+            } else {
+                sorted.forEach((speaker, i) => {
+                    const type = settings.types.find(t => t.name === speaker.type);
+                    totalQueueTime += type?.time || 0;
+                    const bgColor = type?.color || '#FFFFFF';
+                    const textColor = isColorDark(bgColor) ? 'text-white' : 'text-gray-800';
+
+                    const adminLi = document.createElement('li');
+                    adminLi.className = `flex justify-between items-center p-3 rounded-md shadow-sm ${textColor}`;
+                    adminLi.style.backgroundColor = bgColor;
+                    adminLi.innerHTML = `<div><p class="font-semibold">${speaker.name}</p><p class="text-sm opacity-75">(${speaker.party || 'Nezávislý'})</p></div><button data-id="${speaker.id}" class="remove-speaker-btn hover:opacity-75 font-bold text-xl px-2 ${textColor}">&times;</button>`;
+                    ui.adminSpeakerList.appendChild(adminLi);
+
+                    const presLi = document.createElement('li');
+                    presLi.className = `p-3 rounded-md shadow-sm ${textColor}`;
+                    presLi.style.backgroundColor = bgColor;
+                    if (i === 0) {
+                        presLi.classList.add('cursor-pointer', 'border-4');
+                        presLi.style.borderColor = darkenColor(bgColor, 0.2);
+                        presLi.id = 'next-speaker-tile';
+                        presLi.title = "Kliknutím přesunout do prezentace";
+                    }
+                    presLi.innerHTML = `<p class="font-semibold">${speaker.name} <span class="text-sm opacity-75 font-normal">(${speaker.party || 'Nezávislý'})</span></p>`;
+                    ui.speakerQueueList.appendChild(presLi);
+                });
+            }
+            ui.queueSummary.innerHTML = `<span><i class="fa-solid fa-users mr-1"></i> ${sorted.length}</span><span class="ml-4"><i class="fa-solid fa-clock mr-1"></i> ~${Math.ceil(totalQueueTime / 60)} min</span>`;
+            ui.nextSpeakerBtn.disabled = sorted.length === 0;
+        };
+
+        const renderSettings = (settingsData) => {
+            const types = settingsData?.types || [];
+            ui.settingsList.innerHTML = '';
+            ui.contributionTypeSelect.innerHTML = '';
+            if (types.length === 0) {
+                ui.settingsList.innerHTML = '<p class="text-center text-gray-500">Žádné typy příspěvků.</p>';
+                ui.contributionTypeSelect.innerHTML = '<option>Žádné typy k dispozici</option>';
+            } else {
+                types.forEach((s, i) => {
+                    const div = document.createElement('div');
+                    div.className = 'setting-item p-2 bg-gray-100 rounded-md space-y-2 cursor-grab';
+                    div.dataset.name = s.name;
+                    div.draggable = true;
+                    div.innerHTML = `<div class="flex justify-between items-center"><span class="font-bold">${s.name}</span><button data-name="${s.name}" class="remove-setting-btn text-red-500 hover:text-red-700 font-bold text-xl">&times;</button></div><div class="flex justify-between items-center text-sm gap-2"><span><i class="fa-solid fa-clock w-4"></i> ${s.time}s</span><input type="color" value="${s.color || '#FFFFFF'}" class="setting-color-input" data-index="${i}" title="Změnit barvu"><span><i class="fa-solid fa-users-slash w-4"></i> Max:</span><input type="number" value="${s.maxSignups || ''}" class="setting-max-input w-16 text-center border rounded" placeholder="∞" data-index="${i}"></div>`;
+                    ui.settingsList.appendChild(div);
+                    const opt = document.createElement('option');
+                    opt.value = s.name;
+                    opt.textContent = s.name;
+                    ui.contributionTypeSelect.appendChild(opt);
+                });
+            }
+
+            const parties = settingsData?.parties || [];
+            ui.partiesList.innerHTML = '';
+            ui.partySelect.innerHTML = '<option value="">Nezávislý</option>';
+            if (parties.length === 0) {
+                ui.partiesList.innerHTML = '<p class="text-center text-gray-500">Žádné politické strany.</p>';
+            } else {
+                parties.forEach(p => {
+                    const div = document.createElement('div');
+                    div.className = 'flex justify-between items-center p-2 bg-gray-100 rounded-md';
+                    div.innerHTML = `<span>${p.name}</span><button data-name="${p.name}" class="remove-party-btn text-red-500 hover:text-red-700 font-bold text-xl">&times;</button>`;
+                    ui.partiesList.appendChild(div);
+                    const opt = document.createElement('option');
+                    opt.value = p.name;
+                    opt.textContent = p.name;
+                    ui.partySelect.appendChild(opt);
+                });
+            }
+        };
+        
+        const setInitialData = async () => {
+            const docSnap = await getDoc(configDocRef);
+            if (!docSnap.exists()) {
+                await setDoc(configDocRef, {
+                    settings: {
+                        signupsEnabled: true,
+                        types: [{ name: "Standardní příspěvek", time: 180, color: "#FFFFFF", maxSignups: null }, { name: "Reakce", time: 60, color: "#FED7D7", maxSignups: null }, { name: "Faktická poznámka", time: 30, color: "#BEE3F8", maxSignups: null }],
+                        parties: [{ name: "Vládní strana" }, { name: "Opoziční strana" }]
+                    },
+                    state: { currentSpeaker: null, timer: { timeRemaining: 0, totalTime: 0, isRunning: false } }
+                });
+            }
+        };
+
+        // --- Auth & Main Listener ---
+        onAuthStateChanged(auth, user => {
+            if (user) {
+                currentUser = user; ui.authSection.style.display = 'none'; ui.mainContent.style.display = 'flex';
+                ui.userInfo.textContent = `ID: ${user.uid}`; switchView('presenter');
+
+                onSnapshot(configDocRef, doc => {
+                    dbState = doc.data() || {};
+                    const { state = {}, settings = {} } = dbState;
+                    renderSettings(settings);
+                    
+                    const canSignups = settings.signupsEnabled ?? true;
+                    ui.signupsEnabledToggle.checked = canSignups;
+                    ui.signupFormContainer.style.display = canSignups ? 'block' : 'none';
+                    ui.signupsDisabledMessage.style.display = canSignups ? 'none' : 'block';
+
+                    const speaker = state.currentSpeaker;
+                    ui.currentSpeakerName.textContent = speaker?.name || '- Nikdo -';
+                    ui.currentSpeakerTitle.textContent = speaker?.type || 'Právě mluví';
+                    
+                    const timer = state.timer || {};
+                    if (!isDraggingTimer) { timeRemaining = timer.timeRemaining ?? 0; totalTime = timer.totalTime ?? 0; }
+                    updateTimerDisplay();
+
+                    if (timer.isRunning && !timerInterval) {
+                        timerInterval = setInterval(() => {
+                            if (timeRemaining > 0) { timeRemaining--; updateTimerDisplay(); } 
+                            else { if (timerInterval) clearInterval(timerInterval); timerInterval = null; if (dbState.state.timer.isRunning) advanceToNextSpeaker(); }
+                        }, 1000);
+                    } else if (!timer.isRunning && timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+                    
+                    ui.startTimerBtn.disabled = timer.isRunning || timeRemaining <= 0;
+                    ui.pauseTimerBtn.disabled = !timer.isRunning;
+                });
+
+                onSnapshot(query(queueRef), qSnap => renderQueue(qSnap.docs.map(d => ({...d.data(), id: d.id}))));
+                setInitialData();
+            } else {
+                currentUser = null;
+                signInAnonymously(auth).catch(e => { ui.authSection.innerHTML = `<h1 class="text-2xl font-bold text-red-600">Přihlášení selhalo</h1>`; });
+            }
+        });
+
+        // --- Event Listeners ---
+        ui.navBtns.forEach(b => b.addEventListener('click', () => switchView(b.dataset.view)));
+
+        ui.signupBtn.addEventListener('click', async () => {
+            const name = ui.speakerNameInput.value.trim(), typeName = ui.contributionTypeSelect.value, partyName = ui.partySelect.value;
+            if (!name || !typeName) return showModal("Vyplňte jméno a typ příspěvku.");
+
+            const typeSetting = dbState.settings?.types.find(t => t.name === typeName);
+            if (typeSetting?.maxSignups != null) {
+                const qSnap = await getDocs(query(queueRef, where("type", "==", typeName)));
+                if (qSnap.size >= typeSetting.maxSignups) return showModal(`Byl dosažen maximální počet přihlášek (${typeSetting.maxSignups}) pro typ "${typeName}".`);
+            }
+            
+            try {
+                await runTransaction(db, async (t) => {
+                    const cfgDoc = await t.get(configDocRef); const qSnap = await getDocs(query(queueRef));
+                    if (qSnap.empty && !cfgDoc.data().state.currentSpeaker) {
+                        const newTotalTime = typeSetting?.time ?? 0;
+                        t.update(configDocRef, { "state.currentSpeaker": { name, type: typeName, party: partyName }, "state.timer": { timeRemaining: newTotalTime, totalTime: newTotalTime, isRunning: false } });
+                    } else { t.set(doc(collection(db, "artifacts", appId, "public/data/queue")), { name, type: typeName, party: partyName, timestamp: new Date() }); }
+                });
+                showModal("Úspěšně přihlášen/a."); switchView('presenter');
+            } catch (e) { console.error(e); showModal("Přihlášení selhalo."); }
+        });
+
+        ui.addSettingBtn.addEventListener('click', async () => {
+            const name = ui.newSettingName.value.trim(), time = parseInt(ui.newSettingTime.value), color = ui.newSettingColor.value;
+            if (!name || isNaN(time) || time <= 0) return showModal("Zadejte platný název a čas > 0.");
+            const settings = [...(dbState.settings?.types || [])];
+            if (settings.some(s => s.name === name)) return showModal("Tento typ již existuje.");
+            await updateDoc(configDocRef, { "settings.types": [...settings, { name, time, color, maxSignups: null }] });
+            ui.newSettingName.value = ''; ui.newSettingTime.value = ''; ui.newSettingColor.value = '#FFFFFF';
+        });
+        
+        ui.settingsList.addEventListener('input', async e => {
+            if (!e.target.matches('.setting-color-input, .setting-max-input')) return;
+            const idx = e.target.dataset.index;
+            const settings = [...dbState.settings.types];
+            if (e.target.matches('.setting-color-input')) settings[idx].color = e.target.value;
+            if (e.target.matches('.setting-max-input')) settings[idx].maxSignups = e.target.value === '' ? null : parseInt(e.target.value, 10);
+            await updateDoc(configDocRef, { "settings.types": settings });
+        });
+
+        ui.settingsList.addEventListener('click', async e => {
+            if (e.target.classList.contains('remove-setting-btn')) {
+                const name = e.target.dataset.name;
+                await updateDoc(configDocRef, { "settings.types": dbState.settings.types.filter(s => s.name !== name) });
+            }
+        });
+
+        ui.addPartyBtn.addEventListener('click', async () => {
+            const name = ui.newPartyNameInput.value.trim();
+            if (!name) return;
+            const parties = [...(dbState.settings?.parties || [])];
+            if (parties.some(p => p.name === name)) return showModal("Tato strana již existuje.");
+            await updateDoc(configDocRef, { "settings.parties": [...parties, { name }] });
+            ui.newPartyNameInput.value = '';
+        });
+
+        ui.partiesList.addEventListener('click', async e => {
+            if (e.target.classList.contains('remove-party-btn')) {
+                const name = e.target.dataset.name;
+                await updateDoc(configDocRef, { "settings.parties": dbState.settings.parties.filter(p => p.name !== name) });
+            }
+        });
+
+        $$('.collapsible-trigger').forEach(t => t.addEventListener('click', () => {
+            const content = t.nextElementSibling;
+            const icon = t.querySelector('i');
+            content.classList.toggle('hidden');
+            icon.classList.toggle('rotate-180');
+        }));
+
+        ui.adminSpeakerList.addEventListener('click', e => { if (e.target.matches('.remove-speaker-btn')) deleteDoc(doc(queueRef, e.target.dataset.id)); });
+        ui.speakerQueueList.addEventListener('click', e => { if (e.target.closest('#next-speaker-tile')) advanceToNextSpeaker(); });
+        
+        ui.nextSpeakerBtn.addEventListener('click', advanceToNextSpeaker);
+        ui.startTimerBtn.addEventListener('click', () => updateDoc(configDocRef, { "state.timer.isRunning": true }));
+        ui.pauseTimerBtn.addEventListener('click', () => updateDoc(configDocRef, { "state.timer.isRunning": false, "state.timer.timeRemaining": timeRemaining }));
+        ui.resetTimerBtn.addEventListener('click', resetTimer);
+        ui.signupsEnabledToggle.addEventListener('change', e => updateDoc(configDocRef, { "settings.signupsEnabled": e.target.checked }));
+        
+        // --- Drag and Drop Logic ---
+        let draggedItem = null;
+        ui.settingsList.addEventListener('dragstart', e => { draggedItem = e.target; e.target.classList.add('dragging'); });
+        ui.settingsList.addEventListener('dragend', e => { e.target.classList.remove('dragging'); draggedItem = null; });
+        ui.settingsList.addEventListener('dragover', e => { e.preventDefault(); const afterElement = getDragAfterElement(ui.settingsList, e.clientY); if (afterElement == null) { ui.settingsList.appendChild(draggedItem); } else { ui.settingsList.insertBefore(draggedItem, afterElement); } });
+        ui.settingsList.addEventListener('drop', async e => {
+            e.preventDefault();
+            const newOrderNames = [...ui.settingsList.querySelectorAll('.setting-item')].map(item => item.dataset.name);
+            const newSettings = newOrderNames.map(name => dbState.settings.types.find(s => s.name === name));
+            await updateDoc(configDocRef, { 'settings.types': newSettings });
+        });
+        function getDragAfterElement(container, y) {
+            const draggableElements = [...container.querySelectorAll('.setting-item:not(.dragging)')];
+            return draggableElements.reduce((closest, child) => {
+                const box = child.getBoundingClientRect(); const offset = y - box.top - box.height / 2;
+                return (offset < 0 && offset > closest.offset) ? { offset: offset, element: child } : closest;
+            }, { offset: Number.NEGATIVE_INFINITY }).element;
+        }
+
+        // --- Timer Drag Logic ---
+        const handleTimerDrag = (e) => {
+            if (!isDraggingTimer || totalTime <= 0) return; e.preventDefault();
+            const rect = ui.timerDisplay.getBoundingClientRect(), x = e.touches ? e.touches[0].clientX : e.clientX, y = e.touches ? e.touches[0].clientY : e.clientY;
+            const angle = Math.atan2(y - (rect.top + rect.height / 2), x - (rect.left + rect.width / 2)) + Math.PI / 2;
+            timeRemaining = Math.round((angle < 0 ? angle + 2 * Math.PI : angle) / (2 * Math.PI) * totalTime);
+            updateTimerDisplay();
+        };
+        const startDrag = () => { if (totalTime > 0) { isDraggingTimer = true; ui.timerDisplay.style.cursor = 'grabbing'; if (dbState.state?.timer?.isRunning) updateDoc(configDocRef, { "state.timer.isRunning": false }); } };
+        const stopDrag = () => { if (isDraggingTimer) { isDraggingTimer = false; ui.timerDisplay.style.cursor = 'grab'; updateDoc(configDocRef, { "state.timer.timeRemaining": timeRemaining }); } };
+        
+        ui.timerDisplay.addEventListener('mousedown', startDrag); document.addEventListener('mousemove', handleTimerDrag); document.addEventListener('mouseup', stopDrag);
+        ui.timerDisplay.addEventListener('touchstart', startDrag); document.addEventListener('touchmove', handleTimerDrag); document.addEventListener('touchend', stopDrag);
+    </script>
+</body>
+</html>
