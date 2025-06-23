@@ -151,12 +151,12 @@
 
         // --- Basic Setup ---
         const firebaseConfig = {
-              apiKey: "AIzaSyAyAXoqQA8SbBe2-ilDSKNoHPmTengxlEY",
-              authDomain: "mluvomat.firebaseapp.com",
-              projectId: "mluvomat",
-              storageBucket: "mluvomat.firebasestorage.app",
-              messagingSenderId: "399583547545",
-              appId: "1:399583547545:web:4e3e45b7cc952dc567e808"
+            apiKey: "AIzaSyAyAXoqQA8SbBe2-ilDSKNoHPmTengxlEY",
+            authDomain: "mluvomat.firebaseapp.com",
+            projectId: "mluvomat",
+            storageBucket: "mluvomat.firebasestorage.app",
+            messagingSenderId: "399583547545",
+            appId: "1:399583547545:web:4e3e45b7cc952dc567e808"
         };
         if (!firebaseConfig.apiKey) document.getElementById('auth-section').innerHTML = `<h1 class="text-2xl font-bold text-red-600 mb-4">Chyba Konfigurace</h1><p class="text-gray-600">Konfigurace Firebase nebyla nalezena.</p>`;
         
@@ -292,4 +292,4 @@
         ui.timerDisplay.addEventListener('mousedown',startDrag);document.addEventListener('mousemove',handleTimerDrag);document.addEventListener('mouseup',stopDrag);ui.timerDisplay.addEventListener('touchstart',startDrag);document.addEventListener('touchmove',handleTimerDrag);document.addEventListener('touchend',stopDrag);
     </script>
 </body>
-</html>
+</ht
