@@ -28,6 +28,13 @@
         .toggle-checkbox:checked + .toggle-label .dot { transform: translateX(20px); }
         .tile { border: 2px solid transparent; transition: all 0.2s ease-in-out; }
         .tile.selected { border-color: #3B82F6; box-shadow: 0 0 0 2px #3B82F6; }
+        /* Fullscreen Mode */
+        body.fullscreen #main-header { display: none; }
+        body.fullscreen #app { padding: 0; }
+        body.fullscreen #presenter-view { border-radius: 0; }
+        #exit-fullscreen-btn { display: none; }
+        body.fullscreen #exit-fullscreen-btn { display: block; }
+        body.fullscreen #fullscreen-btn { display: none; }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800">
@@ -41,7 +48,7 @@
 
         <!-- Main Content -->
         <div id="main-content" class="hidden flex flex-col flex-grow min-h-0">
-            <header class="bg-white rounded-lg shadow-md p-4 mb-8 flex-shrink-0">
+            <header id="main-header" class="bg-white rounded-lg shadow-md p-4 mb-8 flex-shrink-0">
                 <div class="flex flex-wrap justify-between items-center gap-4">
                     <div>
                         <h1 class="text-2xl font-bold text-blue-700">Studentský Parlament</h1>
@@ -58,11 +65,13 @@
             <!-- Presenter View -->
             <div id="presenter-view" class="view p-4 md:p-8 bg-white rounded-lg shadow-md flex-grow">
                 <div class="grid md:grid-cols-3 gap-8 h-full">
-                    <div class="md:col-span-2 bg-gray-100 p-8 rounded-lg text-center flex flex-col">
+                    <div class="md:col-span-2 bg-gray-100 p-8 rounded-lg text-center flex flex-col relative">
                         <h2 id="current-speaker-title" class="text-2xl font-semibold text-gray-500 mb-4">Právě mluví</h2>
                         <p id="current-speaker-name" class="text-5xl font-bold text-blue-700 break-words">- Nikdo -</p>
                         <div id="timer-display" class="relative w-48 h-48 mx-auto my-6"><svg class="w-full h-full" viewBox="0 0 100 100"><circle class="text-gray-300" stroke-width="8" stroke="currentColor" fill="transparent" r="45" cx="50" cy="50" /><circle id="timer-ring-circle" class="timer-ring text-blue-600" stroke-width="8" stroke-linecap="round" stroke="currentColor" fill="transparent" r="45" cx="50" cy="50" transform="rotate(-90 50 50)" /></svg><span id="time-left" class="absolute inset-0 flex items-center justify-center text-4xl font-mono font-bold">00:00</span></div>
                         <div class="flex justify-center space-x-4"><button id="start-timer-btn" class="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-lg font-semibold disabled:bg-gray-400"><i class="fa-solid fa-play mr-2"></i>Start</button><button id="pause-timer-btn" class="bg-yellow-500 hover:bg-yellow-600 text-white px-6 py-2 rounded-lg font-semibold disabled:bg-gray-400"><i class="fa-solid fa-pause mr-2"></i>Pauza</button><button id="reset-timer-btn" class="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg font-semibold"><i class="fa-solid fa-sync mr-2"></i>Reset</button></div>
+                        <button id="fullscreen-btn" class="absolute bottom-4 left-4 text-gray-400 hover:text-gray-600 z-10" title="Celá obrazovka"><i class="fa-solid fa-expand fa-lg"></i></button>
+                        <button id="exit-fullscreen-btn" class="absolute bottom-4 left-4 text-gray-400 hover:text-gray-600 z-10" title="Ukončit celou obrazovku"><i class="fa-solid fa-compress fa-lg"></i></button>
                     </div>
                     <div class="bg-gray-100 p-6 rounded-lg flex flex-col min-h-0">
                         <h2 class="text-xl font-semibold text-gray-500 mb-4 text-center flex-shrink-0">Další na řadě</h2>
@@ -176,6 +185,7 @@
             queueSummary:$('#queue-summary'),
             partiesList:$('#parties-list'),newPartyNameInput:$('#new-party-name'),addPartyBtn:$('#add-party-btn'),
             partySelectionContainer:$('#party-selection-container'),partiesAdminSection:$('#parties-admin-section'),
+            fullscreenBtn: $('#fullscreen-btn'), exitFullscreenBtn: $('#exit-fullscreen-btn'),
         };
         
         // --- Core Functions ---
@@ -240,10 +250,10 @@
             if(!docSnap.exists()){await setDoc(configDocRef,{settings:{signupsEnabled:true,partiesEnabled:true,types:[{name:"Standardní příspěvek",time:180,color:"#FFFFFF",maxSignups:null},{name:"Reakce",time:60,color:"#FED7D7",maxSignups:null},{name:"Faktická poznámka",time:30,color:"#BEE3F8",maxSignups:null}],parties:[{name:"Vládní strana"},{name:"Opoziční strana"}]},state:{currentSpeaker:null,timer:{timeRemaining:0,totalTime:0,isRunning:false}}})}
         }
 
-        onAuthStateChanged(auth,user=>{if(user){currentUser=user;ui.authSection.style.display='none';ui.mainContent.style.display='flex';ui.userInfo.textContent=`ID: ${user.uid}`;switchView('presenter');onSnapshot(configDocRef,doc=>{dbState=doc.data()||{};const{state={},settings={}}=dbState;renderSettings(settings);renderQueue(currentQueue);const c=settings.signupsEnabled??true;ui.signupsEnabledToggle.checked=c;ui.signupFormContainer.style.display=c?'block':'none';ui.signupsDisabledMessage.style.display=c?'none':'block';const s=state.currentSpeaker;ui.currentSpeakerName.textContent=s?.name||'- Nikdo -';ui.currentSpeakerTitle.textContent=s?.type||'Právě mluví';const t=state.timer||{};if(!isDraggingTimer){timeRemaining=t.timeRemaining??0;totalTime=t.totalTime??0;}updateTimerDisplay();if(t.isRunning&&!timerInterval){timerInterval=setInterval(()=>{if(timeRemaining>0){timeRemaining--;updateTimerDisplay()}else{if(timerInterval)clearInterval(timerInterval);timerInterval=null;if(dbState.state.timer.isRunning)advanceToNextSpeaker()}},1e3)}else if(!t.isRunning&&timerInterval){clearInterval(timerInterval);timerInterval=null}ui.startTimerBtn.disabled=t.isRunning||timeRemaining<=0;ui.pauseTimerBtn.disabled=!t.isRunning});onSnapshot(query(queueRef),qSnap=>{currentQueue=qSnap.docs.map(d=>({...d.data(),id:d.id}));renderQueue(currentQueue)});setInitialData()}else{currentUser=null;signInAnonymously(auth).catch(e=>{ui.authSection.innerHTML=`<h1 class="text-2xl font-bold text-red-600">Přihlášení selhalo</h1>`})}});
+        onAuthStateChanged(auth,user=>{if(user){currentUser=user;ui.authSection.style.display='none';ui.mainContent.style.display='flex';ui.userInfo.textContent=`ID: ${user.uid}`;ui.speakerNameInput.value=localStorage.getItem('parliamentSpeakerName')||'';switchView('presenter');onSnapshot(configDocRef,doc=>{dbState=doc.data()||{};const{state={},settings={}}=dbState;renderSettings(settings);renderQueue(currentQueue);const c=settings.signupsEnabled??true;ui.signupsEnabledToggle.checked=c;ui.signupFormContainer.style.display=c?'block':'none';ui.signupsDisabledMessage.style.display=c?'none':'block';const s=state.currentSpeaker;ui.currentSpeakerName.textContent=s?.name||'- Nikdo -';ui.currentSpeakerTitle.textContent=s?.type||'Právě mluví';const t=state.timer||{};if(!isDraggingTimer){timeRemaining=t.timeRemaining??0;totalTime=t.totalTime??0;}updateTimerDisplay();if(t.isRunning&&!timerInterval){timerInterval=setInterval(()=>{if(timeRemaining>0){timeRemaining--;updateTimerDisplay()}else{if(timerInterval)clearInterval(timerInterval);timerInterval=null;if(dbState.state.timer.isRunning)advanceToNextSpeaker()}},1e3)}else if(!t.isRunning&&timerInterval){clearInterval(timerInterval);timerInterval=null}ui.startTimerBtn.disabled=t.isRunning||timeRemaining<=0;ui.pauseTimerBtn.disabled=!t.isRunning});onSnapshot(query(queueRef),qSnap=>{currentQueue=qSnap.docs.map(d=>({...d.data(),id:d.id}));renderQueue(currentQueue)});setInitialData()}else{currentUser=null;signInAnonymously(auth).catch(e=>{ui.authSection.innerHTML=`<h1 class="text-2xl font-bold text-red-600">Přihlášení selhalo</h1>`})}});
         
         ui.navBtns.forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.view)));
-        ui.signupBtn.addEventListener('click',async()=>{const name=ui.speakerNameInput.value.trim();if(!name){return showModal("Vyplňte prosím jméno.")}try{const isDuplicate = currentQueue.some(speaker => speaker.name.toLowerCase() === name.toLowerCase() && speaker.type === selectedContribution); if(isDuplicate){throw new Error(`Řečník <b>${name}</b> je již přihlášen s tímto typem příspěvku.`);} await runTransaction(db,async t=>{const c=await t.get(configDocRef),q=await getDocs(query(queueRef));const typeSetting=dbState.settings?.types.find(s=>s.name===selectedContribution);if(typeSetting?.maxSignups!=null){const qSnap=await getDocs(query(queueRef,where("type","==",selectedContribution)));if(qSnap.size>=typeSetting.maxSignups)throw new Error(`Byl dosažen maximální počet přihlášek pro tento typ.`);}if(q.empty&&!c.data().state.currentSpeaker){const n=typeSetting?.time??0;t.update(configDocRef,{"state.currentSpeaker":{name,type:selectedContribution,party:selectedParty},"state.timer":{timeRemaining:n,totalTime:n,isRunning:false}})}else{t.set(doc(collection(db,"artifacts",appId,"public/data/queue")),{name,type:selectedContribution,party:selectedParty,timestamp:new Date()})}});showModal("Úspěšně přihlášen/a.");ui.speakerNameInput.value='';switchView('presenter');}catch(e){showModal(e.message||"Přihlášení selhalo.")}});
+        ui.signupBtn.addEventListener('click',async()=>{try{const name=ui.speakerNameInput.value.trim();if(!name){return showModal("Vyplňte prosím jméno.")}localStorage.setItem('parliamentSpeakerName',name);const isDuplicate=currentQueue.some(speaker=>speaker.name.toLowerCase()===name.toLowerCase()&&speaker.type===selectedContribution);if(isDuplicate){throw new Error(`Řečník <b>${name}</b> je již přihlášen s tímto typem příspěvku.`);}await runTransaction(db,async t=>{const c=await t.get(configDocRef),q=await getDocs(query(queueRef));const typeSetting=dbState.settings?.types.find(s=>s.name===selectedContribution);if(typeSetting?.maxSignups!=null){const qSnap=await getDocs(query(queueRef,where("type","==",selectedContribution)));if(qSnap.size>=typeSetting.maxSignups)throw new Error(`Byl dosažen maximální počet přihlášek pro tento typ.`);}if(q.empty&&!c.data().state.currentSpeaker){const n=typeSetting?.time??0;t.update(configDocRef,{"state.currentSpeaker":{name,type:selectedContribution,party:selectedParty},"state.timer":{timeRemaining:n,totalTime:n,isRunning:false}})}else{t.set(doc(collection(db,"artifacts",appId,"public/data/queue")),{name,type:selectedContribution,party:selectedParty,timestamp:new Date()})}});showModal("Úspěšně přihlášen/a.");ui.speakerNameInput.value=localStorage.getItem('parliamentSpeakerName')||'';switchView('presenter');}catch(e){showModal(e.message||"Přihlášení selhalo.")}});
         
         const handleTileSelection=(container,value,isParty)=>{if(isParty){selectedParty=value;}else{selectedContribution=value;}[...container.children].forEach(t=>t.classList.toggle('selected',t.dataset.name===value));updateSignupButtonState();};
         ui.partyTiles.addEventListener('click',e=>{if(e.target.matches('.tile'))handleTileSelection(ui.partyTiles,e.target.dataset.name,true)});
@@ -264,6 +274,8 @@
         ui.resetTimerBtn.addEventListener('click',resetTimer);
         ui.signupsEnabledToggle.addEventListener('change',e=>updateDoc(configDocRef,{"settings.signupsEnabled":e.target.checked}));
         ui.partiesEnabledToggle.addEventListener('change',e=>updateDoc(configDocRef,{"settings.partiesEnabled":e.target.checked}));
+        ui.fullscreenBtn.addEventListener('click', () => document.body.classList.add('fullscreen'));
+        ui.exitFullscreenBtn.addEventListener('click', () => document.body.classList.remove('fullscreen'));
         let draggedItem=null;ui.settingsList.addEventListener('dragstart',e=>{draggedItem=e.target;e.target.classList.add('dragging')});ui.settingsList.addEventListener('dragend',e=>{e.target.classList.remove('dragging');draggedItem=null});ui.settingsList.addEventListener('dragover',e=>{e.preventDefault();const a=getDragAfterElement(ui.settingsList,e.clientY);if(a==null){ui.settingsList.appendChild(draggedItem)}else{ui.settingsList.insertBefore(draggedItem,a)}});
         ui.settingsList.addEventListener('drop',async e=>{e.preventDefault();const n=[...ui.settingsList.querySelectorAll('.setting-item')].map(i=>i.dataset.name),s=n.map(name=>dbState.settings.types.find(x=>x.name===name));await updateDoc(configDocRef,{'settings.types':s})});
         function getDragAfterElement(c,y){const d=[...c.querySelectorAll('.setting-item:not(.dragging)')];return d.reduce((closest,child)=>{const b=child.getBoundingClientRect(),o=y-b.top-b.height/2;return(o<0&&o>closest.offset)?{offset:o,element:child}:closest},{offset:Number.NEGATIVE_INFINITY}).element}
