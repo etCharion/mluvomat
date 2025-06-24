@@ -111,9 +111,17 @@
                         <div class="scrollable-list-container"><ul id="admin-speaker-list" class="space-y-2 scrollable-list pr-2"></ul></div>
                     </div>
                     <div class="bg-gray-50 p-4 rounded-lg flex flex-col min-h-0">
-                        <div class="space-y-4 mb-4 flex-shrink-0">
-                            <div class="p-3 border rounded-lg bg-white flex items-center justify-between"><label for="signups-enabled-toggle" class="flex items-center cursor-pointer w-full justify-between"><span class="font-semibold text-gray-700 mr-3">Povolit přihlašování</span><div class="relative"><input type="checkbox" id="signups-enabled-toggle" class="toggle-checkbox"><label for="signups-enabled-toggle" class="toggle-label"><div class="dot"></div></label></div></label></div>
-                            <div class="p-3 border rounded-lg bg-white flex items-center justify-between"><label for="parties-enabled-toggle" class="flex items-center cursor-pointer w-full justify-between"><span class="font-semibold text-gray-700 mr-3">Povolit strany</span><div class="relative"><input type="checkbox" id="parties-enabled-toggle" class="toggle-checkbox"><label for="parties-enabled-toggle" class="toggle-label"><div class="dot"></div></label></div></label></div>
+                        <div class="grid grid-cols-2 gap-4 mb-4 flex-shrink-0">
+                            <div class="p-3 border rounded-lg bg-white flex items-center justify-between">
+                                <label for="signups-enabled-toggle" class="flex items-center cursor-pointer w-full justify-between"><span class="font-semibold text-gray-700 mr-3">Povolit přihlašování</span>
+                                    <div class="relative"><input type="checkbox" id="signups-enabled-toggle" class="toggle-checkbox"><label for="signups-enabled-toggle" class="toggle-label"><div class="dot"></div></label></div>
+                                </label>
+                            </div>
+                            <div class="p-3 border rounded-lg bg-white flex items-center justify-between">
+                                <label for="parties-enabled-toggle" class="flex items-center cursor-pointer w-full justify-between"><span class="font-semibold text-gray-700 mr-3">Povolit strany</span>
+                                    <div class="relative"><input type="checkbox" id="parties-enabled-toggle" class="toggle-checkbox"><label for="parties-enabled-toggle" class="toggle-label"><div class="dot"></div></label></div>
+                                </label>
+                            </div>
                         </div>
                         <div class="scrollable-list-container"><div class="scrollable-list pr-2 space-y-4">
                             <div class="collapsible-section">
@@ -151,6 +159,7 @@
         import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, addDoc, deleteDoc, runTransaction, updateDoc, query, getDocs, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+        // --- Basic Setup ---
         const firebaseConfig = {
             apiKey: "AIzaSyAyAXoqQA8SbBe2-ilDSKNoHPmTengxlEY",
             authDomain: "mluvomat.firebaseapp.com",
@@ -170,9 +179,11 @@
         const configDocRef = doc(db, "artifacts", appId, "public/data/config", "main");
         const queueRef = collection(db, "artifacts", appId, "public/data/queue");
         
+        // --- Global State ---
         let currentUser = null, isAdmin = false, timerInterval = null, timeRemaining = 0, totalTime = 0, isDraggingTimer = false, dbState = {};
         let selectedParty = null, selectedContribution = null, currentQueue = [];
 
+        // --- UI Element Query Selector ---
         const $ = (selector) => document.querySelector(selector);
         const $$ = (selector) => document.querySelectorAll(selector);
         
@@ -195,6 +206,7 @@
             adminsList: $('#admins-list'), newAdminEmail: $('#new-admin-email'), addAdminBtn: $('#add-admin-btn'),
         };
         
+        // --- Core Functions ---
         const showModal=(message)=>{ui.modalText.innerHTML=message;ui.messageModal.classList.remove('hidden');};
         ui.modalCloseBtn.addEventListener('click',()=>ui.messageModal.classList.add('hidden'));
         
@@ -272,9 +284,8 @@
             ui.adminNavBtn.style.display = isAdmin ? 'inline-block' : 'none';
             ui.timerControls.style.display = isAdmin ? 'flex' : 'none';
             if (!isAdmin) {
-                // Remove drag functionality for non-admins
                 ui.timerDisplay.style.cursor = 'default';
-                isDraggingTimer = false; // Ensure dragging stops if role changes
+                isDraggingTimer = false; 
             } else {
                 ui.timerDisplay.style.cursor = 'grab';
             }
@@ -286,7 +297,7 @@
         ui.logoutBtn.addEventListener('click',()=>signOut(auth));
         
         ui.navBtns.forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.view)));
-        ui.signupBtn.addEventListener('click',async()=>{try{const name=ui.speakerNameInput.value.trim();if(!name){return showModal("Vyplňte prosím jméno.")}localStorage.setItem('parliamentSpeakerName',name);const isDuplicate=currentQueue.some(speaker=>speaker.name.toLowerCase()===name.toLowerCase()&&speaker.type===selectedContribution);if(isDuplicate){throw new Error(`Řečník <b>${name}</b> je již přihlášen s tímto typem příspěvku.`);}await runTransaction(db,async t=>{const c=await t.get(configDocRef),q=await getDocs(query(queueRef));const typeSetting=dbState.settings?.types.find(s=>s.name===selectedContribution);if(typeSetting?.maxSignups!=null){const qSnap=await getDocs(query(queueRef,where("type","==",selectedContribution)));if(qSnap.size>=typeSetting.maxSignups)throw new Error(`Byl dosažen maximální počet přihlášek pro tento typ.`);}if(q.empty&&!c.data().state.currentSpeaker){const n=typeSetting?.time??0;t.update(configDocRef,{"state.currentSpeaker":{name,type:selectedContribution,party:selectedParty},"state.timer":{timeRemaining:n,totalTime:n,isRunning:false}})}else{t.set(doc(collection(db,"artifacts",appId,"public/data/queue")),{name,type:selectedContribution,party:selectedParty,timestamp:new Date()})}});showModal("Úspěšně přihlášen/a.");switchView('presenter');}catch(e){showModal(e.message||"Přihlášení selhalo.")}});
+        ui.signupBtn.addEventListener('click',async()=>{try{await runTransaction(db,async t=>{const c=await t.get(configDocRef),q=await getDocs(query(queueRef));const typeSetting=dbState.settings?.types.find(s=>s.name===selectedContribution);if(typeSetting?.maxSignups!=null){const qSnap=await getDocs(query(queueRef,where("type","==",selectedContribution)));if(qSnap.size>=typeSetting.maxSignups)throw new Error(`Byl dosažen maximální počet přihlášek pro tento typ.`);}const name=ui.speakerNameInput.value.trim();const isDuplicate=currentQueue.some(speaker=>speaker.name.toLowerCase()===name.toLowerCase()&&speaker.type===selectedContribution);if(isDuplicate){throw new Error(`Řečník <b>${name}</b> je již přihlášen s tímto typem příspěvku.`);}if(q.empty&&!c.data().state.currentSpeaker){const n=typeSetting?.time??0;t.update(configDocRef,{"state.currentSpeaker":{name,type:selectedContribution,party:selectedParty},"state.timer":{timeRemaining:n,totalTime:n,isRunning:false}})}else{t.set(doc(collection(db,"artifacts",appId,"public/data/queue")),{name,type:selectedContribution,party:selectedParty,timestamp:new Date()})}});localStorage.setItem('parliamentSpeakerName',ui.speakerNameInput.value.trim());showModal("Úspěšně přihlášen/a.");switchView('presenter');}catch(e){showModal(e.message||"Přihlášení selhalo.")}});
         
         const handleTileSelection=(container,value,isParty)=>{if(isParty){selectedParty=value;}else{selectedContribution=value;}[...container.children].forEach(t=>t.classList.toggle('selected',t.dataset.name===value));updateSignupButtonState();};
         ui.partyTiles.addEventListener('click',e=>{if(e.target.matches('.tile'))handleTileSelection(ui.partyTiles,e.target.dataset.name,true)});
