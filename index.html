@@ -240,8 +240,13 @@
             ui.signupBtn.disabled = !(nameFilled && partySelected && contributionSelected);
         }
 
-        function renderQueue(queue){
-            const settings=dbState.settings||{types:[]};const sorted=[...queue].sort((a,b)=>{const pA=settings.types.findIndex(s=>s.name===a.type),pB=settings.types.findIndex(s=>s.name===b.type);return pA!==pB?pB-pA:(a.timestamp?.toMillis()||0)-(b.timestamp?.toMillis()||0)});
+        function renderQueue(queue, settingsData){
+            const settings = settingsData || {types:[]};
+            const sorted=[...queue].sort((a,b)=>{
+                const pA=settings.types.findIndex(s=>s.name===a.type),
+                      pB=settings.types.findIndex(s=>s.name===b.type);
+                return pA!==pB ? pB-pA : (a.timestamp?.toMillis()||0)-(b.timestamp?.toMillis()||0)
+            });
             ui.adminSpeakerList.innerHTML='';ui.speakerQueueList.innerHTML='';let totalQueueTime=0;
             if(sorted.length===0){const e='<li class="p-3 bg-white rounded-md shadow-sm text-center text-gray-500">Seznam je prázdný.</li>';ui.adminSpeakerList.innerHTML=e;ui.speakerQueueList.innerHTML=e;}else{sorted.forEach((speaker,i)=>{const type=settings.types.find(t=>t.name===speaker.type);totalQueueTime+=type?.time||0;const bgColor=type?.color||'#FFFFFF',textColor=isColorDark(bgColor)?'text-white':'text-gray-800';const adminLi=document.createElement('li');adminLi.className=`flex justify-between items-center p-3 rounded-md shadow-sm ${textColor}`;adminLi.style.backgroundColor=bgColor;
             const partyInfo = (dbState.settings?.partiesEnabled) ? `(${(speaker.party || 'Nezávislý')})` : '';
@@ -317,7 +322,6 @@
             } else {
                 ui.timerDisplay.style.cursor = 'grab';
             }
-            // Add a class to the body to easily target admin-only styles
             document.body.classList.toggle('is-admin', isAdminStatus);
         }
 
@@ -338,6 +342,10 @@
                     isAdmin = settings.admins?.includes(user.email) ?? false;
                     setUiForAdmin(isAdmin);
                     renderSettings(settings);
+                    
+                    // KLÍČOVÁ OPRAVA: Vždy překresli frontu, když se změní konfigurace,
+                    // aby se projevily změny v prioritách nebo jiných nastaveních.
+                    renderQueue(currentQueue, settings);
                     
                     const signupsEnabled = settings.signupsEnabled ?? true;
                     ui.signupsEnabledToggle.checked = signupsEnabled;
@@ -382,7 +390,9 @@
                 // Listener for queue collection
                 onSnapshot(query(queueRef), qSnap => {
                     currentQueue = qSnap.docs.map(d => ({...d.data(), id: d.id}));
-                    renderQueue(currentQueue); // This is the ONLY place that should re-render the queue from a snapshot
+                    // KLÍČOVÁ OPRAVA: Předej aktuální nastavení do renderQueue,
+                    // aby bylo zajištěno správné řazení.
+                    renderQueue(currentQueue, dbState.settings);
                 }, err => {
                     console.error("Chyba při čtení fronty:", err);
                     showModal("Nepodařilo se načíst seznam řečníků. Zkontrolujte konzoli pro více detailů.");
@@ -415,7 +425,7 @@
                 
                 await runTransaction(db,async t=>{
                     const configDoc = await t.get(configDocRef);
-                    const queueSnapshot = await getDocs(query(queueRef)); // Get queue inside transaction for consistency
+                    const queueSnapshot = await getDocs(query(queueRef));
                     
                     const typeSetting = dbState.settings?.types.find(s=>s.name===selectedContribution);
                     if (typeSetting?.maxSignups != null) {
