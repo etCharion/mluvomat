@@ -10,7 +10,7 @@
     <style>
         html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; }
         body { font-family: 'Inter', sans-serif; display: flex; flex-direction: column; }
-        #app { width: 100%; max-width: 1600px; margin-left: auto; margin-right: auto; padding: 1rem; flex-grow: 1; display: flex; flex-direction: column; min-height: 0; }
+        #app { width: 100%; max-width: 1400px; margin-left: auto; margin-right: auto; padding: 1rem; flex-grow: 1; display: flex; flex-direction: column; min-height: 0; }
         .view { display: none; flex-grow: 1; min-height: 0; }
         .active-view { display: flex; flex-direction: column; min-height: 0; }
         .scrollable-list-container { display: flex; flex-direction: column; min-height: 0; flex-grow: 1; }
@@ -20,7 +20,7 @@
         input[type="color"] { -webkit-appearance: none; border: none; width: 32px; height: 32px; border-radius: 8px; cursor: pointer; }
         input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
         input[type="color"]::-webkit-color-swatch { border: 1px solid #ccc; border-radius: 8px; }
-        .setting-item.dragging, .party-item.dragging { opacity: 0.5; }
+        .setting-item.dragging { opacity: 0.5; }
         .toggle-checkbox { display: none; }
         .toggle-label { display: block; width: 40px; height: 20px; background-color: #e2e8f0; border-radius: 9999px; position: relative; transition: background-color 0.2s; cursor: pointer; }
         .toggle-label .dot { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; background: white; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: transform 0.2s; }
@@ -28,8 +28,8 @@
         .toggle-checkbox:checked + .toggle-label .dot { transform: translateX(20px); }
         .tile { border: 2px solid transparent; transition: all 0.2s ease-in-out; }
         .tile.selected { border-color: #3B82F6; box-shadow: 0 0 0 2px #3B82F6; }
-        body.fullscreen #main-header, body.fullscreen #admin-nav-btn { display: none; }
-        body.fullscreen #app { padding: 0; max-width: 100%; }
+        body.fullscreen #main-header { display: none; }
+        body.fullscreen #app { padding: 0; }
         body.fullscreen #presenter-view { border-radius: 0; }
         #exit-fullscreen-btn { display: none; }
         body.fullscreen #exit-fullscreen-btn { display: block; }
@@ -65,8 +65,8 @@
 
             <!-- Presenter View -->
             <div id="presenter-view" class="view p-4 md:p-8 bg-white rounded-lg shadow-md flex-grow">
-                <div class="grid md:grid-cols-3 gap-4 h-full">
-                    <div class="md:col-span-1 bg-gray-100 p-6 rounded-lg text-center flex flex-col relative">
+                <div class="grid md:grid-cols-3 gap-8 h-full">
+                    <div class="md:col-span-2 bg-gray-100 p-8 rounded-lg text-center flex flex-col relative">
                         <h2 id="current-speaker-title" class="text-2xl font-semibold text-gray-500 mb-4">Právě mluví</h2>
                         <p id="current-speaker-name" class="text-5xl font-bold text-blue-700 break-words">- Nikdo -</p>
                         <div id="timer-display" class="relative w-48 h-48 mx-auto my-6"><svg class="w-full h-full" viewBox="0 0 100 100"><circle class="text-gray-300" stroke-width="8" stroke="currentColor" fill="transparent" r="45" cx="50" cy="50" /><circle id="timer-ring-circle" class="timer-ring text-blue-600" stroke-width="8" stroke-linecap="round" stroke="currentColor" fill="transparent" r="45" cx="50" cy="50" transform="rotate(-90 50 50)" /></svg><span id="time-left" class="absolute inset-0 flex items-center justify-center text-4xl font-mono font-bold">00:00</span></div>
@@ -74,10 +74,10 @@
                         <button id="fullscreen-btn" class="absolute bottom-4 left-4 text-gray-400 hover:text-gray-600 z-10" title="Celá obrazovka"><i class="fa-solid fa-expand fa-lg"></i></button>
                         <button id="exit-fullscreen-btn" class="absolute bottom-4 left-4 text-gray-400 hover:text-gray-600 z-10" title="Ukončit celou obrazovku"><i class="fa-solid fa-compress fa-lg"></i></button>
                     </div>
-                    <div class="md:col-span-2 bg-gray-100 p-6 rounded-lg flex flex-col min-h-0">
+                    <div class="bg-gray-100 p-6 rounded-lg flex flex-col min-h-0">
                         <h2 class="text-xl font-semibold text-gray-500 mb-4 text-center flex-shrink-0">Další na řadě</h2>
-                        <div id="speaker-queue-columns" class="grid grid-cols-3 gap-4 flex-grow min-h-0">
-                             <!-- Columns will be populated by JS -->
+                        <div class="scrollable-list-container flex-grow">
+                             <ul id="speaker-queue-list" class="space-y-3 scrollable-list pr-2"></ul>
                         </div>
                         <div id="queue-summary" class="mt-4 pt-4 border-t border-gray-300 text-center text-sm text-gray-600 flex-shrink-0"></div>
                     </div>
@@ -282,8 +282,7 @@
         async function setInitialData(){
             const docSnap=await getDoc(configDocRef);
             if(!docSnap.exists()){await setDoc(configDocRef,{settings:{signupsEnabled:true,partiesEnabled:true,
-            // NASTAV ZDE SVŮJ E-MAIL JAKO VÝCHOZÍHO ADMINA
-            admins: ["tvoje.email@adresa.com"],
+            admins: ["gunka.daniel@gmail.com"],
             types:[{name:"Standardní příspěvek",time:180,color:"#FFFFFF",maxSignups:null},{name:"Reakce",time:60,color:"#FED7D7",maxSignups:null},{name:"Faktická poznámka",time:30,color:"#BEE3F8",maxSignups:null}],parties:[{name:"Vládní strana",group:"Koalice",color:"#A0AEC0"},{name:"Opoziční strana",group:"Opozice",color:"#A0AEC0"}]},state:{currentSpeaker:null,timer:{timeRemaining:0,totalTime:0,isRunning:false}}})}
         }
         
@@ -332,4 +331,4 @@
         ui.timerDisplay.addEventListener('mousedown',startDrag);document.addEventListener('mousemove',handleTimerDrag);document.addEventListener('mouseup',stopDrag);ui.timerDisplay.addEventListener('touchstart',startDrag);document.addEventListener('touchmove',handleTimerDrag);document.addEventListener('touchend',stopDrag);
     </script>
 </body>
-</html>
+</ht
