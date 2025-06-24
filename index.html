@@ -20,20 +20,22 @@
         input[type="color"] { -webkit-appearance: none; border: none; width: 32px; height: 32px; border-radius: 8px; cursor: pointer; }
         input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
         input[type="color"]::-webkit-color-swatch { border: 1px solid #ccc; border-radius: 8px; }
-        .setting-item.dragging { opacity: 0.5; }
+        .setting-item.dragging { opacity: 0.5; background-color: #e0e7ff; }
         .toggle-checkbox { display: none; }
         .toggle-label { display: block; width: 40px; height: 20px; background-color: #e2e8f0; border-radius: 9999px; position: relative; transition: background-color 0.2s; cursor: pointer; }
         .toggle-label .dot { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; background: white; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: transform 0.2s; }
         .toggle-checkbox:checked + .toggle-label { background-color: #48BB78; }
         .toggle-checkbox:checked + .toggle-label .dot { transform: translateX(20px); }
-        .tile { border: 2px solid transparent; transition: all 0.2s ease-in-out; }
         .tile.selected { border-color: #3B82F6; box-shadow: 0 0 0 2px #3B82F6; }
+        body.fullscreen #main-content { padding: 0; max-width: 100%; height: 100vh; margin-bottom: 0; }
         body.fullscreen #main-header { display: none; }
-        body.fullscreen #app { padding: 0; }
-        body.fullscreen #presenter-view { border-radius: 0; }
+        body.fullscreen #app { padding: 0; max-width:100%; }
+        body.fullscreen #presenter-view { border-radius: 0; height: 100%; }
         #exit-fullscreen-btn { display: none; }
         body.fullscreen #exit-fullscreen-btn { display: block; }
         body.fullscreen #fullscreen-btn { display: none; }
+        .collapsible-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-in-out; }
+        .collapsible-content:not(.hidden) { max-height: 1000px; /* Adjust as needed */ }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800">
@@ -50,7 +52,7 @@
 
         <!-- Main Content -->
         <div id="main-content" class="hidden flex flex-col flex-grow min-h-0">
-            <header id="main-header" class="bg-white rounded-lg shadow-md p-4 mb-8 flex-shrink-0">
+            <header id="main-header" class="bg-white rounded-lg shadow-md p-4 mb-4 flex-shrink-0">
                 <div class="flex flex-wrap justify-between items-center gap-4">
                     <div>
                         <h1 class="text-2xl font-bold text-blue-700">Studentský Parlament</h1>
@@ -126,7 +128,7 @@
                                 </div>
                             </div>
                             <div class="collapsible-section">
-                                <button class="collapsible-trigger w-full text-left font-bold text-lg p-2 bg-white rounded-lg shadow flex justify-between items-center"><span>Typy příspěvků</span><i class="fa-solid fa-chevron-down transform rotate-180"></i></button>
+                                <button class="collapsible-trigger w-full text-left font-bold text-lg p-2 bg-white rounded-lg shadow flex justify-between items-center"><span>Typy příspěvků</span><i class="fa-solid fa-chevron-down transform"></i></button>
                                 <div class="collapsible-content space-y-3 mt-2 hidden">
                                     <div class="mb-2 text-center text-xs text-gray-500">Přetáhnutím změňte prioritu (nejvyšší je dole).</div>
                                     <div id="settings-list"></div>
@@ -159,7 +161,7 @@
             apiKey: "AIzaSyAyAXoqQA8SbBe2-ilDSKNoHPmTengxlEY",
             authDomain: "mluvomat.firebaseapp.com",
             projectId: "mluvomat",
-            storageBucket: "mluvomat.firebasestorage.app",
+            storageBucket: "mluvomat.appspot.com",
             messagingSenderId: "399583547545",
             appId: "1:399583547545:web:4e3e45b7cc952dc567e808"
         };
@@ -177,6 +179,7 @@
         // --- Global State ---
         let currentUser = null, isAdmin = false, timerInterval = null, timeRemaining = 0, totalTime = 0, isDraggingTimer = false, dbState = {};
         let selectedParty = null, selectedContribution = null, currentQueue = [];
+        let unsubscribeConfig, unsubscribeQueue; // To hold listener unsub functions
 
         // --- UI Element Query Selector ---
         const $ = (selector) => document.querySelector(selector);
@@ -206,8 +209,16 @@
         ui.modalCloseBtn.addEventListener('click',()=>ui.messageModal.classList.add('hidden'));
         
         const switchView=(viewName)=>{
-            Object.values(ui.views).forEach(v=>v.classList.remove('active-view'));
-            if(ui.views[viewName])ui.views[viewName].classList.add('active-view');
+            Object.values(ui.views).forEach(v=>v.classList.remove('active-view','flex','items-center','justify-center'));
+            Object.values(ui.views).forEach(v=>v.classList.add('hidden'));
+            
+            if(ui.views[viewName]) {
+                 ui.views[viewName].classList.remove('hidden');
+                 ui.views[viewName].classList.add('active-view');
+                 if(viewName === 'speaker') {
+                     ui.views[viewName].classList.add('flex', 'items-center', 'justify-center');
+                 }
+            }
             ui.navBtns.forEach(b=>b.classList.toggle('bg-blue-200',b.dataset.view===viewName));
             if (viewName === 'speaker') {
                 handleTileSelection(ui.contributionTiles, ui.contributionTiles.children[0]?.dataset.name || null, false);
@@ -221,7 +232,7 @@
         const updateTimerDisplay=()=>{const m=Math.floor(timeRemaining/60).toString().padStart(2,'0'),s=(timeRemaining%60).toString().padStart(2,'0');ui.timeLeftDisplay.textContent=`${m}:${s}`;ui.timerRingCircle.style.strokeDashoffset=283*(1-(totalTime>0?timeRemaining/totalTime:0));};
 
         async function resetTimer(){if(timerInterval){clearInterval(timerInterval);timerInterval=null;}const s=dbState.state?.currentSpeaker,t=dbState.settings?.types.find(y=>y.name===s?.type);totalTime=t?t.time:0;timeRemaining=totalTime;await updateDoc(configDocRef,{"state.timer":{timeRemaining,totalTime,isRunning:false}});}
-        async function advanceToNextSpeaker(){if(isDraggingTimer)return;try{await runTransaction(db,async t=>{const c=await t.get(configDocRef),s=c.data()?.settings||{types:[]},q=await getDocs(query(queueRef));let n=q.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>{const pA=s.types.findIndex(x=>x.name===a.type),pB=s.types.findIndex(x=>x.name===b.type);return pA!==pB?pB-pA:(a.timestamp?.toMillis()||0)-(b.timestamp?.toMillis()||0)});const e=n.length>0?n[0]:null,o=e?s.types.find(x=>x.name===e.type):null,i=o?o.time:0;t.update(configDocRef,{"state.currentSpeaker":e?{name:e.name,type:e.type,party:e.party}:null,"state.timer":{timeRemaining:i,totalTime:i,isRunning:false}}),e&&t.delete(doc(queueRef,e.id))})}catch(e){console.error(e);showModal("Nepodařilo se přesunout řečníka.")}}
+        async function advanceToNextSpeaker(){if(isDraggingTimer)return;try{await runTransaction(db,async t=>{const c=await t.get(configDocRef),s=c.data()?.settings||{types:[]};const qSnap=await getDocs(query(queueRef));let n=qSnap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>{const pA=s.types.findIndex(x=>x.name===a.type),pB=s.types.findIndex(x=>x.name===b.type);return pA!==pB?pB-pA:(a.timestamp?.toMillis()||0)-(b.timestamp?.toMillis()||0)});const e=n.length>0?n[0]:null,o=e?s.types.find(x=>x.name===e.type):null,i=o?o.time:0;t.update(configDocRef,{"state.currentSpeaker":e?{name:e.name,type:e.type,party:e.party}:null,"state.timer":{timeRemaining:i,totalTime:i,isRunning:false}}),e&&t.delete(doc(queueRef,e.id))})}catch(e){console.error(e);showModal("Nepodařilo se přesunout řečníka.")}}
         
         function updateSignupButtonState() {
             const nameFilled = ui.speakerNameInput.value.trim() !== '';
@@ -236,7 +247,7 @@
             ui.adminSpeakerList.innerHTML='';ui.speakerQueueList.innerHTML='';let totalQueueTime=0;
             if(sorted.length===0){const e='<li class="p-3 bg-white rounded-md shadow-sm text-center text-gray-500">Seznam je prázdný.</li>';ui.adminSpeakerList.innerHTML=e;ui.speakerQueueList.innerHTML=e;}else{sorted.forEach((speaker,i)=>{const type=settings.types.find(t=>t.name===speaker.type);totalQueueTime+=type?.time||0;const bgColor=type?.color||'#FFFFFF',textColor=isColorDark(bgColor)?'text-white':'text-gray-800';const adminLi=document.createElement('li');adminLi.className=`flex justify-between items-center p-3 rounded-md shadow-sm ${textColor}`;adminLi.style.backgroundColor=bgColor;
             const partyInfo = (dbState.settings?.partiesEnabled) ? `(${(speaker.party || 'Nezávislý')})` : '';
-            adminLi.innerHTML=`<div><p class="font-semibold">${speaker.name}</p><p class="text-sm opacity-75">${partyInfo}</p></div><button data-id="${speaker.id}" class="remove-speaker-btn hover:opacity-75 font-bold text-xl px-2 ${textColor}">&times;</button>`;ui.adminSpeakerList.appendChild(adminLi);const presLi=document.createElement('li');presLi.className=`p-3 rounded-md shadow-sm ${textColor}`;presLi.style.backgroundColor=bgColor;if(i===0){presLi.classList.add(isAdmin?'cursor-pointer':'','border-4');presLi.style.borderColor=darkenColor(bgColor,0.2);presLi.id='next-speaker-tile';presLi.title=isAdmin?"Kliknutím přesunout do prezentace":"";}presLi.innerHTML=`<p class="font-semibold">${speaker.name} <span class="text-sm opacity-75 font-normal">${partyInfo}</span></p>`;ui.speakerQueueList.appendChild(presLi)})}
+            adminLi.innerHTML=`<div><p class="font-semibold">${speaker.name} <span class="text-sm opacity-75 font-normal">${partyInfo}</span></p><p class="text-sm opacity-75">${speaker.type}</p></div><button data-id="${speaker.id}" class="remove-speaker-btn hover:opacity-75 font-bold text-xl px-2 ${textColor}">&times;</button>`;ui.adminSpeakerList.appendChild(adminLi);const presLi=document.createElement('li');presLi.className=`p-3 rounded-md shadow-sm ${textColor}`;presLi.style.backgroundColor=bgColor;if(i===0){presLi.classList.add(isAdmin?'cursor-pointer':'','border-4');presLi.style.borderColor=darkenColor(bgColor,0.2);presLi.id='next-speaker-tile';presLi.title=isAdmin?"Kliknutím přesunout do prezentace":"";}presLi.innerHTML=`<p class="font-semibold">${speaker.name} <span class="text-sm opacity-75 font-normal">${partyInfo}</span></p>`;ui.speakerQueueList.appendChild(presLi)})}
             ui.queueSummary.innerHTML=`<span><i class="fa-solid fa-users mr-1"></i> ${sorted.length}</span><span class="ml-4"><i class="fa-solid fa-clock mr-1"></i> ~${Math.ceil(totalQueueTime/60)} min</span>`;ui.nextSpeakerBtn.disabled=sorted.length===0;
         }
 
@@ -246,7 +257,7 @@
             if(types.length===0){ui.settingsList.innerHTML='<p class="text-center text-gray-500">Žádné typy příspěvků.</p>';}else{types.forEach((s,i)=>{const d=document.createElement('div');d.className='setting-item p-2 bg-gray-100 rounded-md space-y-2 cursor-grab';d.dataset.name=s.name;d.draggable=true;d.innerHTML=`<div class="flex justify-between items-center"><span class="font-bold">${s.name}</span><button data-name="${s.name}" class="remove-setting-btn text-red-500 hover:text-red-700 font-bold text-xl">&times;</button></div><div class="flex justify-between items-center text-sm gap-2"><span><i class="fa-solid fa-clock w-4"></i> ${s.time}s</span><input type="color" value="${s.color||'#FFFFFF'}" class="setting-color-input" data-index="${i}" title="Změnit barvu"><span><i class="fa-solid fa-users-slash w-4"></i> Max:</span><input type="number" value="${s.maxSignups||''}" class="setting-max-input w-16 text-center border rounded" placeholder="∞" data-index="${i}"></div>`;ui.settingsList.appendChild(d);const t=document.createElement('button');const o=isColorDark(s.color)?'text-white':'text-gray-800';t.className=`tile p-2 rounded-lg hover:opacity-80 ${o}`;t.style.backgroundColor=s.color||'#E5E7EB';t.dataset.name=s.name;t.textContent=s.name;ui.contributionTiles.appendChild(t)})}
             
             ui.adminsList.innerHTML = '';
-            admins.forEach((email, i) => { const div = document.createElement('div'); div.className = 'flex justify-between items-center p-2 bg-gray-100 rounded-md'; const removeBtn = (i > 0) ? `<button data-email="${email}" class="remove-admin-btn text-red-500 hover:text-red-700 font-bold text-xl">&times;</button>` : `<i class="fa-solid fa-crown text-yellow-500" title="Super admin"></i>`; div.innerHTML = `<span>${email}</span>${removeBtn}`; ui.adminsList.appendChild(div); });
+            admins.forEach((email, i) => { const div = document.createElement('div'); div.className = 'flex justify-between items-center p-2 bg-gray-100 rounded-md'; const removeBtn = (admins.length > 1) ? `<button data-email="${email}" class="remove-admin-btn text-red-500 hover:text-red-700 font-bold text-xl">&times;</button>` : `<i class="fa-solid fa-crown text-yellow-500" title="Super admin"></i>`; div.innerHTML = `<span>${email}</span>${removeBtn}`; ui.adminsList.appendChild(div); });
             
             const partiesEnabled=settingsData?.partiesEnabled??true;
             ui.partiesAdminSection.style.display=partiesEnabled?'block':'none';
@@ -261,33 +272,38 @@
             handleTileSelection(ui.partyTiles, ui.partyTiles.children[0]?.dataset.name || null, true);
         }
         
+        // --- OPRAVENÁ FUNKCE ---
         async function ensureMainConfigExists() {
+            const userEmail = auth.currentUser?.email;
+            if (!userEmail) return;
+
             const docSnap = await getDoc(configDocRef);
             if (!docSnap.exists()) {
-                // Vytvořit dokument main s minimálním obsahem, pokud přihlášený uživatel je admin
-                const userEmail = auth.currentUser?.email;
-                if (!userEmail) return;
-                // Uložit email aktuálního uživatele do pole admins
-                await setDoc(configDocRef, {
-                    settings: {
-                        signupsEnabled: true,
-                        partiesEnabled: true,
-                        admins: ["gunka.daniel@gmail.com"],
-                        types: [
-                            { name: "Standardní příspěvek", time: 180, color: "#FFFFFF", maxSignups: null },
-                            { name: "Reakce", time: 60, color: "#FED7D7", maxSignups: null },
-                            { name: "Faktická poznámka", time: 30, color: "#BEE3F8", maxSignups: null }
-                        ],
-                        parties: [
-                            { name: "Vládní strana" },
-                            { name: "Opoziční strana" }
-                        ]
-                    },
-                    state: {
-                        currentSpeaker: null,
-                        timer: { timeRemaining: 0, totalTime: 0, isRunning: false }
-                    }
-                });
+                console.log("Creating initial config document...");
+                try {
+                    await setDoc(configDocRef, {
+                        settings: {
+                            signupsEnabled: true,
+                            partiesEnabled: true,
+                            admins: [userEmail], // První přihlášený uživatel je admin
+                            types: [
+                                { name: "Standardní příspěvek", time: 180, color: "#BFDBFE", maxSignups: null },
+                                { name: "Reakce", time: 60, color: "#FED7D7", maxSignups: null },
+                                { name: "Faktická poznámka", time: 30, color: "#BEE3F8", maxSignups: null }
+                            ],
+                            parties: [
+                                { name: "Vládní strana" }, { name: "Opoziční strana" }
+                            ]
+                        },
+                        state: {
+                            currentSpeaker: null,
+                            timer: { timeRemaining: 0, totalTime: 0, isRunning: false }
+                        }
+                    });
+                } catch(e) {
+                    console.error("Error creating initial config:", e);
+                    showModal("Nepodařilo se vytvořit úvodní nastavení. Zkuste to prosím znovu.");
+                }
             }
         }
         
@@ -299,29 +315,101 @@
             document.body.classList.toggle('is-admin', isAdminStatus);
         }
 
-        onAuthStateChanged(auth, async user => {
+        function startListeners() {
+             // Zastavíme staré posluchače, pokud existují
+            if (unsubscribeConfig) unsubscribeConfig();
+            if (unsubscribeQueue) unsubscribeQueue();
+            
+            unsubscribeConfig = onSnapshot(configDocRef, (doc) => {
+                if (!doc.exists()) return;
+                dbState = doc.data() || {};
+                const { state = {}, settings = {} } = dbState;
+
+                isAdmin = settings.admins?.includes(currentUser?.email) ?? false;
+                setUiForAdmin(isAdmin);
+
+                renderSettings(settings);
+                renderQueue(currentQueue); // re-render s novým nastavením
+
+                const signupsEnabled = settings.signupsEnabled ?? true;
+                ui.signupsEnabledToggle.checked = signupsEnabled;
+                ui.signupFormContainer.style.display = signupsEnabled ? 'block' : 'none';
+                ui.signupsDisabledMessage.style.display = signupsEnabled ? 'none' : 'block';
+
+                const currentSpeaker = state.currentSpeaker;
+                ui.currentSpeakerName.textContent = currentSpeaker?.name || '- Nikdo -';
+                ui.currentSpeakerTitle.textContent = currentSpeaker?.type || 'Právě mluví';
+
+                const timerState = state.timer || {};
+                if (!isDraggingTimer) {
+                    timeRemaining = timerState.timeRemaining ?? 0;
+                    totalTime = timerState.totalTime ?? 0;
+                }
+                updateTimerDisplay();
+
+                if (timerState.isRunning && !timerInterval) {
+                    timerInterval = setInterval(() => {
+                        if (timeRemaining > 0) {
+                            timeRemaining--;
+                            updateTimerDisplay();
+                        } else {
+                            if (timerInterval) clearInterval(timerInterval);
+                            timerInterval = null;
+                            if (dbState.state.timer.isRunning && isAdmin) {
+                                advanceToNextSpeaker();
+                            }
+                        }
+                    }, 1000);
+                } else if (!timerState.isRunning && timerInterval) {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                }
+
+                ui.startTimerBtn.disabled = timerState.isRunning || timeRemaining <= 0 || !state.currentSpeaker;
+                ui.pauseTimerBtn.disabled = !timerState.isRunning;
+            });
+
+            unsubscribeQueue = onSnapshot(query(queueRef), (qSnap) => {
+                currentQueue = qSnap.docs.map(d => ({...d.data(), id: d.id }));
+                renderQueue(currentQueue);
+            });
+        }
+        
+        // --- OPRAVENÁ HLAVNÍ FUNKCE ---
+        onAuthStateChanged(auth, async (user) => {
             if (user) {
                 currentUser = user;
                 ui.authSection.style.display = 'none';
-                ui.mainContent.style.display = 'flex';
+                ui.mainContent.classList.remove('hidden');
+                ui.mainContent.classList.add('flex');
                 ui.userInfo.textContent = `Přihlášen jako: ${user.displayName || user.email}`;
                 ui.speakerNameInput.value = localStorage.getItem('parliamentSpeakerName') || user.displayName || '';
-                switchView('presenter');
-        
-                // --- NOVĚ! Zajisti, že config/main vznikne při přihlášení admina ---
+                
+                // Zajistíme existenci konfigurace PŘED spuštěním posluchačů
                 await ensureMainConfigExists();
-        
-                // ... zbytek původního kódu zůstává ...
+
+                // Spustíme posluchače, kteří načtou data a vykreslí UI
+                startListeners();
+
+                switchView('presenter');
             } else {
-                // ... původní else ...
+                currentUser = null;
+                isAdmin = false;
+                setUiForAdmin(false);
+                ui.authSection.style.display = 'block';
+                ui.mainContent.classList.add('hidden');
+                ui.mainContent.classList.remove('flex');
+                // Odpojíme posluchače při odhlášení
+                if (unsubscribeConfig) unsubscribeConfig();
+                if (unsubscribeQueue) unsubscribeQueue();
             }
         });
-
+        
         ui.loginBtn.addEventListener('click',()=>signInWithPopup(auth,provider).catch(err=>showModal(`Přihlášení selhalo: ${err.message}`)));
         ui.logoutBtn.addEventListener('click',()=>signOut(auth));
         
         ui.navBtns.forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.view)));
-        ui.signupBtn.addEventListener('click',async()=>{try{const name=ui.speakerNameInput.value.trim();localStorage.setItem('parliamentSpeakerName',name);const isDuplicate=currentQueue.some(s=>s.name.toLowerCase()===name.toLowerCase()&&s.type===selectedContribution);if(isDuplicate){throw new Error(`Řečník <b>${name}</b> je již přihlášen s tímto typem příspěvku.`);}await runTransaction(db,async t=>{const c=await t.get(configDocRef),q=await getDocs(query(queueRef));const typeSetting=dbState.settings?.types.find(s=>s.name===selectedContribution);if(typeSetting?.maxSignups!=null){const qSnap=await getDocs(query(queueRef,where("type","==",selectedContribution)));if(qSnap.size>=typeSetting.maxSignups)throw new Error(`Byl dosažen maximální počet přihlášek pro tento typ.`);}if(q.empty&&!c.data().state.currentSpeaker){const n=typeSetting?.time??0;t.update(configDocRef,{"state.currentSpeaker":{name,type:selectedContribution,party:selectedParty},"state.timer":{timeRemaining:n,totalTime:n,isRunning:false}})}else{t.set(doc(collection(db,"artifacts",appId,"public/data/queue")),{name,type:selectedContribution,party:selectedParty,timestamp:new Date()})}});showModal("Úspěšně přihlášen/a.");ui.speakerNameInput.value='';switchView('presenter');}catch(e){showModal(e.message||"Přihlášení selhalo.")}});
+        ui.signupBtn.addEventListener('click',async()=>{try{const name=ui.speakerNameInput.value.trim();if(!name) throw new Error("Jméno nesmí být prázdné.");localStorage.setItem('parliamentSpeakerName',name);const isDuplicate=currentQueue.some(s=>s.name.toLowerCase()===name.toLowerCase()&&s.type===selectedContribution);if(isDuplicate){throw new Error(`Řečník <b>${name}</b> je již přihlášen s tímto typem příspěvku.`);}await runTransaction(db,async t=>{const c=await t.get(configDocRef);const typeSetting=dbState.settings?.types.find(s=>s.name===selectedContribution);if(typeSetting?.maxSignups!=null){const qSnap=await getDocs(query(queueRef,where("type","==",selectedContribution)));if(qSnap.size>=typeSetting.maxSignups)throw new Error(`Byl dosažen maximální počet přihlášek pro tento typ.`);}const qDocs = await getDocs(query(queueRef)); if(qDocs.empty&&!c.data().state.currentSpeaker){const n=typeSetting?.time??0;t.update(configDocRef,{"state.currentSpeaker":{name,type:selectedContribution,party:selectedParty},"state.timer":{timeRemaining:n,totalTime:n,isRunning:false}})}else{await addDoc(queueRef, {name,type:selectedContribution,party:selectedParty,timestamp:new Date()})}});showModal("Úspěšně přihlášen/a.");ui.speakerNameInput.value=localStorage.getItem('parliamentSpeakerName')||currentUser.displayName||'';switchView('presenter');}catch(e){showModal(e.message||"Přihlášení selhalo.")}});
         
         const handleTileSelection=(container,value,isParty)=>{if(isParty){selectedParty=value;}else{selectedContribution=value;}[...container.children].forEach(t=>t.classList.toggle('selected',t.dataset.name===value));updateSignupButtonState();};
         ui.partyTiles.addEventListener('click',e=>{if(e.target.matches('.tile'))handleTileSelection(ui.partyTiles,e.target.dataset.name,true)});
@@ -329,11 +417,11 @@
         ui.speakerNameInput.addEventListener('input', updateSignupButtonState);
 
         ui.addSettingBtn.addEventListener('click',async()=>{const n=ui.newSettingName.value.trim(),t=parseInt(ui.newSettingTime.value),c=ui.newSettingColor.value;if(!n||isNaN(t)||t<=0)return showModal("Zadejte platný název a čas > 0.");const s=[...(dbState.settings?.types||[])];if(s.some(x=>x.name===n))return showModal("Tento typ již existuje.");await updateDoc(configDocRef,{"settings.types":[...s,{name:n,time:t,color:c,maxSignups:null}]});ui.newSettingName.value='';ui.newSettingTime.value='';ui.newSettingColor.value='#FFFFFF'});
-        ui.settingsList.addEventListener('input',async e=>{if(!e.target.matches('.setting-color-input, .setting-max-input'))return;const i=e.target.dataset.index,s=[...dbState.settings.types];if(e.target.matches('.setting-color-input'))s[i].color=e.target.value;if(e.target.matches('.setting-max-input'))s[i].maxSignups=e.target.value===''?null:parseInt(e.target.value,10);await updateDoc(configDocRef,{"settings.types":s})});
+        ui.settingsList.addEventListener('input',async e=>{if(!e.target.matches('.setting-color-input, .setting-max-input'))return;const i=parseInt(e.target.dataset.index),s=[...dbState.settings.types];if(e.target.matches('.setting-color-input'))s[i].color=e.target.value;if(e.target.matches('.setting-max-input'))s[i].maxSignups=e.target.value===''?null:parseInt(e.target.value,10);if(!isNaN(s[i].maxSignups))await updateDoc(configDocRef,{"settings.types":s})});
         ui.settingsList.addEventListener('click',async e=>{if(e.target.classList.contains('remove-setting-btn')){const n=e.target.dataset.name;await updateDoc(configDocRef,{"settings.types":dbState.settings.types.filter(s=>s.name!==n)})}});
         ui.addPartyBtn.addEventListener('click',async()=>{const n=ui.newPartyNameInput.value.trim();if(!n)return;const p=[...(dbState.settings?.parties||[])];if(p.some(x=>x.name===n))return showModal("Tato strana již existuje.");await updateDoc(configDocRef,{"settings.parties":[...p,{name:n}]});ui.newPartyNameInput.value=''});
         ui.partiesList.addEventListener('click',async e=>{if(e.target.classList.contains('remove-party-btn')){const n=e.target.dataset.name;await updateDoc(configDocRef,{"settings.parties":dbState.settings.parties.filter(p=>p.name!==n)})}});
-        $$('.collapsible-trigger').forEach(t=>t.addEventListener('click',()=>{t.nextElementSibling.classList.toggle('hidden');t.querySelector('i').classList.toggle('rotate-180')}));
+        $$('.collapsible-trigger').forEach(t=>t.addEventListener('click',()=>{const content=t.nextElementSibling;content.classList.toggle('hidden');t.querySelector('i').classList.toggle('rotate-180')}));
         ui.adminSpeakerList.addEventListener('click',e=>{if(isAdmin&&e.target.matches('.remove-speaker-btn'))deleteDoc(doc(queueRef,e.target.dataset.id))});
         ui.speakerQueueList.addEventListener('click',e=>{if(isAdmin&&e.target.closest('#next-speaker-tile'))advanceToNextSpeaker()});
         ui.nextSpeakerBtn.addEventListener('click',advanceToNextSpeaker);
@@ -342,17 +430,18 @@
         ui.resetTimerBtn.addEventListener('click',resetTimer);
         ui.signupsEnabledToggle.addEventListener('change',e=>updateDoc(configDocRef,{"settings.signupsEnabled":e.target.checked}));
         ui.partiesEnabledToggle.addEventListener('change',e=>updateDoc(configDocRef,{"settings.partiesEnabled":e.target.checked}));
-        ui.fullscreenBtn.addEventListener('click', () => document.body.classList.add('fullscreen'));
-        ui.exitFullscreenBtn.addEventListener('click', () => document.body.classList.remove('fullscreen'));
+        ui.fullscreenBtn.addEventListener('click', () => { document.body.classList.add('fullscreen'); document.documentElement.requestFullscreen(); });
+        ui.exitFullscreenBtn.addEventListener('click', () => { document.body.classList.remove('fullscreen'); document.exitFullscreen(); });
+        document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) document.body.classList.remove('fullscreen'); });
         ui.addAdminBtn.addEventListener('click',async()=>{const e=ui.newAdminEmail.value.trim();if(!e)return;const a=[...(dbState.settings?.admins||[])];if(a.includes(e))return showModal("Tento uživatel již je administrátor.");await updateDoc(configDocRef,{"settings.admins":[...a,e]});ui.newAdminEmail.value=''});
         ui.adminsList.addEventListener('click',async e=>{if(e.target.classList.contains('remove-admin-btn')){const t=e.target.dataset.email;await updateDoc(configDocRef,{"settings.admins":dbState.settings.admins.filter(a=>a!==t)})}});
-        let draggedItem=null;ui.settingsList.addEventListener('dragstart',e=>{draggedItem=e.target;e.target.classList.add('dragging')});ui.settingsList.addEventListener('dragend',e=>{e.target.classList.remove('dragging');draggedItem=null});ui.settingsList.addEventListener('dragover',e=>{e.preventDefault();const a=getDragAfterElement(ui.settingsList,e.clientY);if(a==null){ui.settingsList.appendChild(draggedItem)}else{ui.settingsList.insertBefore(draggedItem,a)}});
-        ui.settingsList.addEventListener('drop',async e=>{e.preventDefault();const n=[...ui.settingsList.querySelectorAll('.setting-item')].map(i=>i.dataset.name),s=n.map(name=>dbState.settings.types.find(x=>x.name===name));await updateDoc(configDocRef,{'settings.types':s})});
+        let draggedItem=null;ui.settingsList.addEventListener('dragstart',e=>{draggedItem=e.target;setTimeout(()=>e.target.classList.add('dragging'),0)});ui.settingsList.addEventListener('dragend',e=>e.target.classList.remove('dragging'));ui.settingsList.addEventListener('dragover',e=>{e.preventDefault();const a=getDragAfterElement(ui.settingsList,e.clientY);if(a==null){ui.settingsList.appendChild(draggedItem)}else{ui.settingsList.insertBefore(draggedItem,a)}});
+        ui.settingsList.addEventListener('drop',async e=>{e.preventDefault();if(!draggedItem)return;draggedItem.classList.remove('dragging');const n=[...ui.settingsList.querySelectorAll('.setting-item')].map(i=>i.dataset.name),s=n.map(name=>dbState.settings.types.find(x=>x.name===name)).filter(Boolean);await updateDoc(configDocRef,{'settings.types':s});draggedItem=null;});
         function getDragAfterElement(c,y){const d=[...c.querySelectorAll('.setting-item:not(.dragging)')];return d.reduce((closest,child)=>{const b=child.getBoundingClientRect(),o=y-b.top-b.height/2;return(o<0&&o>closest.offset)?{offset:o,element:child}:closest},{offset:Number.NEGATIVE_INFINITY}).element}
         const handleTimerDrag=(e)=>{if(!isDraggingTimer||totalTime<=0||!isAdmin)return;e.preventDefault();const r=ui.timerDisplay.getBoundingClientRect(),x=e.touches?e.touches[0].clientX:e.clientX,y=e.touches?e.touches[0].clientY:e.clientY,a=Math.atan2(y-(r.top+r.height/2),x-(r.left+r.width/2))+Math.PI/2;timeRemaining=Math.round((a<0?a+2*Math.PI:a)/(2*Math.PI)*totalTime);updateTimerDisplay()};
-        const startDrag=()=>{if(totalTime>0&&isAdmin){isDraggingTimer=true;ui.timerDisplay.style.cursor='grabbing';if(dbState.state?.timer?.isRunning)updateDoc(configDocRef,{"state.timer.isRunning":false})}};
+        const startDrag=(e)=>{if(e.target.closest('#time-left') && totalTime>0&&isAdmin){isDraggingTimer=true;ui.timerDisplay.style.cursor='grabbing';if(dbState.state?.timer?.isRunning)updateDoc(configDocRef,{"state.timer.isRunning":false})}};
         const stopDrag=()=>{if(isDraggingTimer&&isAdmin){isDraggingTimer=false;ui.timerDisplay.style.cursor='grab';updateDoc(configDocRef,{"state.timer.timeRemaining":timeRemaining})}};
-        ui.timerDisplay.addEventListener('mousedown',startDrag);document.addEventListener('mousemove',handleTimerDrag);document.addEventListener('mouseup',stopDrag);ui.timerDisplay.addEventListener('touchstart',startDrag);document.addEventListener('touchmove',handleTimerDrag);document.addEventListener('touchend',stopDrag);
+        ui.timerDisplay.addEventListener('mousedown',startDrag);document.addEventListener('mousemove',handleTimerDrag);document.addEventListener('mouseup',stopDrag);ui.timerDisplay.addEventListener('touchstart',startDrag,{passive:false});document.addEventListener('touchmove',handleTimerDrag,{passive:false});document.addEventListener('touchend',stopDrag);
     </script>
 </body>
 </html>
