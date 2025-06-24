@@ -112,11 +112,8 @@
                     </div>
                     <div class="bg-gray-50 p-4 rounded-lg flex flex-col min-h-0">
                         <div class="grid grid-cols-2 gap-4 mb-4 flex-shrink-0">
-                            <div class="p-3 border rounded-lg bg-white flex items-center justify-between">
-                                <label for="signups-enabled-toggle" class="flex items-center cursor-pointer w-full justify-between"><span class="font-semibold text-gray-700 mr-3">Povolit přihlašování</span><div class="relative"><input type="checkbox" id="signups-enabled-toggle" class="toggle-checkbox"><label for="signups-enabled-toggle" class="toggle-label"><div class="dot"></div></label></div></label></div>
-                            <div class="p-3 border rounded-lg bg-white flex items-center justify-between">
-                                <label for="parties-enabled-toggle" class="flex items-center cursor-pointer w-full justify-between"><span class="font-semibold text-gray-700 mr-3">Povolit strany</span><div class="relative"><input type="checkbox" id="parties-enabled-toggle" class="toggle-checkbox"><label for="parties-enabled-toggle" class="toggle-label"><div class="dot"></div></label></div></label></div>
-                            </div>
+                            <div class="p-3 border rounded-lg bg-white flex items-center justify-between"><label for="signups-enabled-toggle" class="flex items-center cursor-pointer w-full justify-between"><span class="font-semibold text-gray-700 mr-3">Povolit přihlašování</span><div class="relative"><input type="checkbox" id="signups-enabled-toggle" class="toggle-checkbox"><label for="signups-enabled-toggle" class="toggle-label"><div class="dot"></div></label></div></label></div>
+                            <div class="p-3 border rounded-lg bg-white flex items-center justify-between"><label for="parties-enabled-toggle" class="flex items-center cursor-pointer w-full justify-between"><span class="font-semibold text-gray-700 mr-3">Povolit strany</span><div class="relative"><input type="checkbox" id="parties-enabled-toggle" class="toggle-checkbox"><label for="parties-enabled-toggle" class="toggle-label"><div class="dot"></div></label></div></label></div>
                         </div>
                         <div class="scrollable-list-container"><div class="scrollable-list pr-2 space-y-4">
                             <div class="collapsible-section">
@@ -136,7 +133,8 @@
                             </div>
                             <div id="parties-admin-section" class="collapsible-section">
                                 <button class="collapsible-trigger w-full text-left font-bold text-lg p-2 bg-white rounded-lg shadow flex justify-between items-center"><span>Politické strany</span><i class="fa-solid fa-chevron-down transform"></i></button>
-                                <div class="collapsible-content space-y-3 mt-2">
+                                <div class="collapsible-content space-y-3 mt-2 hidden">
+                                    <div class="mb-2 text-center text-xs text-gray-500">Přetáhnutím změňte pořadí.</div>
                                     <div id="parties-list"></div>
                                     <div class="flex gap-4 p-4 border-t items-center"><input type="text" id="new-party-name" placeholder="Název strany" class="flex-grow shadow appearance-none border rounded w-full py-2 px-3 text-gray-700"><button id="add-party-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Přidat stranu</button></div>
                                 </div>
@@ -246,14 +244,8 @@
             if(types.length===0){ui.settingsList.innerHTML='<p class="text-center text-gray-500">Žádné typy příspěvků.</p>';}else{types.forEach((s,i)=>{const d=document.createElement('div');d.className='setting-item p-2 bg-gray-100 rounded-md space-y-2 cursor-grab';d.dataset.name=s.name;d.draggable=true;d.innerHTML=`<div class="flex justify-between items-center"><span class="font-bold">${s.name}</span><button data-name="${s.name}" class="remove-setting-btn text-red-500 hover:text-red-700 font-bold text-xl">&times;</button></div><div class="flex justify-between items-center text-sm gap-2"><span><i class="fa-solid fa-clock w-4"></i> ${s.time}s</span><input type="color" value="${s.color||'#FFFFFF'}" class="setting-color-input" data-index="${i}" title="Změnit barvu"><span><i class="fa-solid fa-users-slash w-4"></i> Max:</span><input type="number" value="${s.maxSignups||''}" class="setting-max-input w-16 text-center border rounded" placeholder="∞" data-index="${i}"></div>`;ui.settingsList.appendChild(d);const t=document.createElement('button');const o=isColorDark(s.color)?'text-white':'text-gray-800';t.className=`tile p-2 rounded-lg hover:opacity-80 ${o}`;t.style.backgroundColor=s.color||'#E5E7EB';t.dataset.name=s.name;t.textContent=s.name;ui.contributionTiles.appendChild(t)})}
             
             ui.adminsList.innerHTML = '';
-            admins.forEach((email, i) => {
-                const div = document.createElement('div');
-                div.className = 'flex justify-between items-center p-2 bg-gray-100 rounded-md';
-                const removeBtn = (i > 0) ? `<button data-email="${email}" class="remove-admin-btn text-red-500 hover:text-red-700 font-bold text-xl">&times;</button>` : `<i class="fa-solid fa-crown text-yellow-500" title="Super admin"></i>`;
-                div.innerHTML = `<span>${email}</span>${removeBtn}`;
-                ui.adminsList.appendChild(div);
-            });
-
+            admins.forEach((email, i) => { const div = document.createElement('div'); div.className = 'flex justify-between items-center p-2 bg-gray-100 rounded-md'; const removeBtn = (i > 0) ? `<button data-email="${email}" class="remove-admin-btn text-red-500 hover:text-red-700 font-bold text-xl">&times;</button>` : `<i class="fa-solid fa-crown text-yellow-500" title="Super admin"></i>`; div.innerHTML = `<span>${email}</span>${removeBtn}`; ui.adminsList.appendChild(div); });
+            
             const partiesEnabled=settingsData?.partiesEnabled??true;
             ui.partiesAdminSection.style.display=partiesEnabled?'block':'none';
             ui.partySelectionContainer.style.display=partiesEnabled?'block':'none';
@@ -270,7 +262,6 @@
         async function setInitialData(){
             const docSnap=await getDoc(configDocRef);
             if(!docSnap.exists()){await setDoc(configDocRef,{settings:{signupsEnabled:true,partiesEnabled:true,
-            // NASTAV ZDE SVŮJ E-MAIL JAKO VÝCHOZÍHO ADMINA
             admins: ["gunka.daniel@gmail.com"],
             types:[{name:"Standardní příspěvek",time:180,color:"#FFFFFF",maxSignups:null},{name:"Reakce",time:60,color:"#FED7D7",maxSignups:null},{name:"Faktická poznámka",time:30,color:"#BEE3F8",maxSignups:null}],parties:[{name:"Vládní strana"},{name:"Opoziční strana"}]},state:{currentSpeaker:null,timer:{timeRemaining:0,totalTime:0,isRunning:false}}})}
         }
@@ -278,12 +269,9 @@
         function setUiForAdmin(isAdmin) {
             ui.adminNavBtn.style.display = isAdmin ? 'inline-block' : 'none';
             ui.timerControls.style.display = isAdmin ? 'flex' : 'none';
-            if (!isAdmin) {
-                ui.timerDisplay.style.cursor = 'default';
-                isDraggingTimer = false; 
-            } else {
-                ui.timerDisplay.style.cursor = 'grab';
-            }
+            if (!isAdmin) { ui.timerDisplay.style.cursor = 'default'; isDraggingTimer = false; } 
+            else { ui.timerDisplay.style.cursor = 'grab'; }
+            document.body.classList.toggle('is-admin', isAdmin);
         }
 
         onAuthStateChanged(auth,user=>{if(user){currentUser=user;ui.authSection.style.display='none';ui.mainContent.style.display='flex';ui.userInfo.textContent=`Přihlášen jako: ${user.displayName||user.email}`;ui.speakerNameInput.value=localStorage.getItem('parliamentSpeakerName')||user.displayName||'';switchView('presenter');onSnapshot(configDocRef,doc=>{dbState=doc.data()||{};const{state={},settings={}}=dbState;isAdmin=settings.admins?.includes(user.email)??false;setUiForAdmin(isAdmin);renderSettings(settings);renderQueue(currentQueue);const c=settings.signupsEnabled??true;ui.signupsEnabledToggle.checked=c;ui.signupFormContainer.style.display=c?'block':'none';ui.signupsDisabledMessage.style.display=c?'none':'block';const s=state.currentSpeaker;ui.currentSpeakerName.textContent=s?.name||'- Nikdo -';ui.currentSpeakerTitle.textContent=s?.type||'Právě mluví';const t=state.timer||{};if(!isDraggingTimer){timeRemaining=t.timeRemaining??0;totalTime=t.totalTime??0;}updateTimerDisplay();if(t.isRunning&&!timerInterval){timerInterval=setInterval(()=>{if(timeRemaining>0){timeRemaining--;updateTimerDisplay()}else{if(timerInterval)clearInterval(timerInterval);timerInterval=null;if(dbState.state.timer.isRunning)advanceToNextSpeaker()}},1e3)}else if(!t.isRunning&&timerInterval){clearInterval(timerInterval);timerInterval=null}ui.startTimerBtn.disabled=t.isRunning||timeRemaining<=0;ui.pauseTimerBtn.disabled=!t.isRunning});onSnapshot(query(queueRef),qSnap=>{currentQueue=qSnap.docs.map(d=>({...d.data(),id:d.id}));renderQueue(currentQueue)});setInitialData()}else{currentUser=null;isAdmin=false;setUiForAdmin(false);ui.authSection.style.display='block';ui.mainContent.style.display='none'}});
@@ -326,4 +314,4 @@
         ui.timerDisplay.addEventListener('mousedown',startDrag);document.addEventListener('mousemove',handleTimerDrag);document.addEventListener('mouseup',stopDrag);ui.timerDisplay.addEventListener('touchstart',startDrag);document.addEventListener('touchmove',handleTimerDrag);document.addEventListener('touchend',stopDrag);
     </script>
 </body>
-</html>
+</ht
