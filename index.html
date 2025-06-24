@@ -28,7 +28,6 @@
         .toggle-checkbox:checked + .toggle-label .dot { transform: translateX(20px); }
         .tile { border: 2px solid transparent; transition: all 0.2s ease-in-out; }
         .tile.selected { border-color: #3B82F6; box-shadow: 0 0 0 2px #3B82F6; }
-        /* Fullscreen Mode */
         body.fullscreen #main-header { display: none; }
         body.fullscreen #app { padding: 0; }
         body.fullscreen #presenter-view { border-radius: 0; }
@@ -40,6 +39,7 @@
 <body class="bg-gray-50 text-gray-800">
 
     <div id="app">
+        <!-- Auth Section -->
         <div id="auth-section" class="text-center p-8 bg-white rounded-lg shadow-md m-auto">
             <h1 class="text-3xl font-bold mb-4">Parlamentní Pořadník</h1>
             <p class="text-gray-600 mb-6">Pro pokračování se prosím přihlaste.</p>
@@ -48,6 +48,7 @@
             </button>
         </div>
 
+        <!-- Main Content -->
         <div id="main-content" class="hidden flex flex-col flex-grow min-h-0">
             <header id="main-header" class="bg-white rounded-lg shadow-md p-4 mb-8 flex-shrink-0">
                 <div class="flex flex-wrap justify-between items-center gap-4">
@@ -64,6 +65,7 @@
                 </div>
             </header>
 
+            <!-- Presenter View -->
             <div id="presenter-view" class="view p-4 md:p-8 bg-white rounded-lg shadow-md flex-grow">
                 <div class="grid md:grid-cols-3 gap-8 h-full">
                     <div class="md:col-span-2 bg-gray-100 p-8 rounded-lg text-center flex flex-col relative">
@@ -84,6 +86,7 @@
                 </div>
             </div>
 
+            <!-- Speaker/User View -->
             <div id="speaker-view" class="view p-8 bg-white rounded-lg shadow-md flex-grow items-center justify-center">
                 <div class="max-w-xl w-full">
                     <h2 class="text-2xl font-bold mb-6 text-center">Přihlásit se o slovo</h2>
@@ -100,15 +103,14 @@
                 </div>
             </div>
 
+            <!-- Admin View -->
             <div id="admin-view" class="view p-4 bg-white rounded-lg shadow-md flex-grow">
                  <div class="grid md:grid-cols-2 gap-4 h-full">
                     <div class="bg-gray-50 p-4 rounded-lg flex flex-col min-h-0">
-                        <h2 class="text-2xl font-bold mb-4 flex-shrink-0">Správa pořadníku</h2>
                         <button id="next-speaker-btn" class="w-full mb-4 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg disabled:bg-gray-400 flex-shrink-0"><i class="fa-solid fa-arrow-right-to-bracket mr-2"></i> POSUNOUT DALŠÍHO</button>
                         <div class="scrollable-list-container"><ul id="admin-speaker-list" class="space-y-2 scrollable-list pr-2"></ul></div>
                     </div>
                     <div class="bg-gray-50 p-4 rounded-lg flex flex-col min-h-0">
-                        <h2 class="text-2xl font-bold mb-4 flex-shrink-0">Nastavení</h2>
                         <div class="grid grid-cols-2 gap-4 mb-4 flex-shrink-0">
                             <div class="p-3 border rounded-lg bg-white flex items-center justify-between">
                                 <label for="signups-enabled-toggle" class="flex items-center cursor-pointer w-full justify-between"><span class="font-semibold text-gray-700 mr-3">Povolit přihlašování</span><div class="relative"><input type="checkbox" id="signups-enabled-toggle" class="toggle-checkbox"><label for="signups-enabled-toggle" class="toggle-label"><div class="dot"></div></label></div></label></div>
@@ -125,7 +127,7 @@
                                 </div>
                             </div>
                             <div class="collapsible-section">
-                                <button class="collapsible-trigger w-full text-left font-bold text-lg p-2 bg-white rounded-lg shadow flex justify-between items-center"><span>Typy příspěvků</span><i class="fa-solid fa-chevron-down transform"></i></button>
+                                <button class="collapsible-trigger w-full text-left font-bold text-lg p-2 bg-white rounded-lg shadow flex justify-between items-center"><span>Typy příspěvků</span><i class="fa-solid fa-chevron-down transform rotate-180"></i></button>
                                 <div class="collapsible-content space-y-3 mt-2 hidden">
                                     <div class="mb-2 text-center text-xs text-gray-500">Přetáhnutím změňte prioritu (nejvyšší je dole).</div>
                                     <div id="settings-list"></div>
@@ -134,8 +136,7 @@
                             </div>
                             <div id="parties-admin-section" class="collapsible-section">
                                 <button class="collapsible-trigger w-full text-left font-bold text-lg p-2 bg-white rounded-lg shadow flex justify-between items-center"><span>Politické strany</span><i class="fa-solid fa-chevron-down transform"></i></button>
-                                <div class="collapsible-content space-y-3 mt-2 hidden">
-                                    <div class="mb-2 text-center text-xs text-gray-500">Přetáhnutím změňte pořadí.</div>
+                                <div class="collapsible-content space-y-3 mt-2">
                                     <div id="parties-list"></div>
                                     <div class="flex gap-4 p-4 border-t items-center"><input type="text" id="new-party-name" placeholder="Název strany" class="flex-grow shadow appearance-none border rounded w-full py-2 px-3 text-gray-700"><button id="add-party-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Přidat stranu</button></div>
                                 </div>
@@ -187,7 +188,7 @@
             speakerNameInput:$('#speaker-name'),partyTiles:$('#party-tiles'),contributionTiles:$('#contribution-tiles'),signupBtn:$('#signup-btn'),
             adminSpeakerList:$('#admin-speaker-list'),nextSpeakerBtn:$('#next-speaker-btn'),settingsList:$('#settings-list'),
             newSettingName:$('#new-setting-name'),newSettingTime:$('#new-setting-time'),newSettingColor:$('#new-setting-color'),addSettingBtn:$('#add-setting-btn'),
-            currentSpeakerTitle:$('#current-speaker-title'),currentSpeakerName:$('#current-speaker-name'),speakerQueueColumns:$('#speaker-queue-columns'),
+            currentSpeakerTitle:$('#current-speaker-title'),currentSpeakerName:$('#current-speaker-name'),speakerQueueList:$('#speaker-queue-list'),
             timeLeftDisplay:$('#time-left'),timerRingCircle:$('#timer-ring-circle'),timerDisplay:$('#timer-display'),timerControls:$('#timer-controls'),
             startTimerBtn:$('#start-timer-btn'),pauseTimerBtn:$('#pause-timer-btn'),resetTimerBtn:$('#reset-timer-btn'),
             messageModal:$('#message-modal'),modalText:$('#modal-text'),modalCloseBtn:$('#modal-close-btn'),
@@ -231,33 +232,11 @@
         }
 
         function renderQueue(queue){
-            const settings=dbState.settings||{types:[],parties:[]};const sorted=[...queue].sort((a,b)=>{const pA=settings.types.findIndex(s=>s.name===a.type),pB=settings.types.findIndex(s=>s.name===b.type);return pA!==pB?pB-pA:(a.timestamp?.toMillis()||0)-(b.timestamp?.toMillis()||0)});
-            
-            ui.adminSpeakerList.innerHTML='';
-            let totalQueueTime=0;
-            if(sorted.length===0){ui.adminSpeakerList.innerHTML='<li class="p-3 bg-white rounded-md shadow-sm text-center text-gray-500">Seznam je prázdný.</li>';}
-            else{sorted.forEach((speaker,i)=>{const type=settings.types.find(t=>t.name===speaker.type);totalQueueTime+=type?.time||0;const bgColor=type?.color||'#FFFFFF',textColor=isColorDark(bgColor)?'text-white':'text-gray-800';const adminLi=document.createElement('li');adminLi.className=`flex justify-between items-center p-3 rounded-md shadow-sm ${textColor}`;adminLi.style.backgroundColor=bgColor;const partyInfo=(settings.partiesEnabled)?`(${(speaker.party||'Nezávislý')})`:'';adminLi.innerHTML=`<div><p class="font-semibold">${speaker.name}</p><p class="text-sm opacity-75">${partyInfo}</p></div><button data-id="${speaker.id}" class="remove-speaker-btn hover:opacity-75 font-bold text-xl px-2 ${textColor}">&times;</button>`;ui.adminSpeakerList.appendChild(adminLi)})}
-            
-            ui.speakerQueueColumns.innerHTML = `
-                <div class="flex flex-col min-h-0"><h3 class="font-bold text-center mb-2 flex-shrink-0">Koalice</h3><ul id="queue-koalice" class="space-y-2 scrollable-list pr-2"></ul></div>
-                <div class="flex flex-col min-h-0"><h3 class="font-bold text-center mb-2 flex-shrink-0">Opozice</h3><ul id="queue-opozice" class="space-y-2 scrollable-list pr-2"></ul></div>
-                <div class="flex flex-col min-h-0"><h3 class="font-bold text-center mb-2 flex-shrink-0">Nezařazení</h3><ul id="queue-nezarazeni" class="space-y-2 scrollable-list pr-2"></ul></div>
-            `;
-            const cols = { Koalice: $('#queue-koalice'), Opozice: $('#queue-opozice'), Nezařazení: $('#queue-nezarazeni') };
-            sorted.forEach((speaker,i)=>{
-                const type=settings.types.find(t=>t.name===speaker.type);
-                const party = settings.parties.find(p => p.name === speaker.party) || { group: 'Nezařazení' };
-                const list = cols[party.group] || cols['Nezařazení'];
-
-                const bgColor=type?.color||'#FFFFFF',textColor=isColorDark(bgColor)?'text-white':'text-gray-800';
-                const presLi=document.createElement('li');presLi.className=`p-3 rounded-md shadow-sm ${textColor}`;presLi.style.backgroundColor=bgColor;
-                if(i===0){presLi.classList.add(isAdmin?'cursor-pointer':'','border-4');presLi.style.borderColor=darkenColor(bgColor,0.2);presLi.id='next-speaker-tile';presLi.title=isAdmin?"Kliknutím přesunout do prezentace":"";}
-                const partyInfo = (settings.partiesEnabled) ? `(${(speaker.party || 'Nezávislý')})` : '';
-                presLi.innerHTML=`<p class="font-semibold">${speaker.name} <span class="text-sm opacity-75 font-normal">${partyInfo}</span></p>`;
-                if(list) list.appendChild(presLi);
-            });
-            Object.values(cols).forEach(col => { if(col && !col.hasChildNodes()) col.innerHTML = '<li class="p-3 text-center text-gray-400 text-sm">Prázdné</li>'; });
-
+            const settings=dbState.settings||{types:[]};const sorted=[...queue].sort((a,b)=>{const pA=settings.types.findIndex(s=>s.name===a.type),pB=settings.types.findIndex(s=>s.name===b.type);return pA!==pB?pB-pA:(a.timestamp?.toMillis()||0)-(b.timestamp?.toMillis()||0)});
+            ui.adminSpeakerList.innerHTML='';ui.speakerQueueList.innerHTML='';let totalQueueTime=0;
+            if(sorted.length===0){const e='<li class="p-3 bg-white rounded-md shadow-sm text-center text-gray-500">Seznam je prázdný.</li>';ui.adminSpeakerList.innerHTML=e;ui.speakerQueueList.innerHTML=e;}else{sorted.forEach((speaker,i)=>{const type=settings.types.find(t=>t.name===speaker.type);totalQueueTime+=type?.time||0;const bgColor=type?.color||'#FFFFFF',textColor=isColorDark(bgColor)?'text-white':'text-gray-800';const adminLi=document.createElement('li');adminLi.className=`flex justify-between items-center p-3 rounded-md shadow-sm ${textColor}`;adminLi.style.backgroundColor=bgColor;
+            const partyInfo = (dbState.settings?.partiesEnabled) ? `(${(speaker.party || 'Nezávislý')})` : '';
+            adminLi.innerHTML=`<div><p class="font-semibold">${speaker.name}</p><p class="text-sm opacity-75">${partyInfo}</p></div><button data-id="${speaker.id}" class="remove-speaker-btn hover:opacity-75 font-bold text-xl px-2 ${textColor}">&times;</button>`;ui.adminSpeakerList.appendChild(adminLi);const presLi=document.createElement('li');presLi.className=`p-3 rounded-md shadow-sm ${textColor}`;presLi.style.backgroundColor=bgColor;if(i===0){presLi.classList.add(isAdmin?'cursor-pointer':'', 'border-4');presLi.style.borderColor=darkenColor(bgColor,0.2);presLi.id='next-speaker-tile';presLi.title=isAdmin?"Kliknutím přesunout do prezentace":"";}presLi.innerHTML=`<p class="font-semibold">${speaker.name} <span class="text-sm opacity-75 font-normal">${partyInfo}</span></p>`;ui.speakerQueueList.appendChild(presLi)})}
             ui.queueSummary.innerHTML=`<span><i class="fa-solid fa-users mr-1"></i> ${sorted.length}</span><span class="ml-4"><i class="fa-solid fa-clock mr-1"></i> ~${Math.ceil(totalQueueTime/60)} min</span>`;ui.nextSpeakerBtn.disabled=sorted.length===0;
         }
 
@@ -267,8 +246,14 @@
             if(types.length===0){ui.settingsList.innerHTML='<p class="text-center text-gray-500">Žádné typy příspěvků.</p>';}else{types.forEach((s,i)=>{const d=document.createElement('div');d.className='setting-item p-2 bg-gray-100 rounded-md space-y-2 cursor-grab';d.dataset.name=s.name;d.draggable=true;d.innerHTML=`<div class="flex justify-between items-center"><span class="font-bold">${s.name}</span><button data-name="${s.name}" class="remove-setting-btn text-red-500 hover:text-red-700 font-bold text-xl">&times;</button></div><div class="flex justify-between items-center text-sm gap-2"><span><i class="fa-solid fa-clock w-4"></i> ${s.time}s</span><input type="color" value="${s.color||'#FFFFFF'}" class="setting-color-input" data-index="${i}" title="Změnit barvu"><span><i class="fa-solid fa-users-slash w-4"></i> Max:</span><input type="number" value="${s.maxSignups||''}" class="setting-max-input w-16 text-center border rounded" placeholder="∞" data-index="${i}"></div>`;ui.settingsList.appendChild(d);const t=document.createElement('button');const o=isColorDark(s.color)?'text-white':'text-gray-800';t.className=`tile p-2 rounded-lg hover:opacity-80 ${o}`;t.style.backgroundColor=s.color||'#E5E7EB';t.dataset.name=s.name;t.textContent=s.name;ui.contributionTiles.appendChild(t)})}
             
             ui.adminsList.innerHTML = '';
-            admins.forEach((email, i) => { const div = document.createElement('div'); div.className = 'flex justify-between items-center p-2 bg-gray-100 rounded-md'; const removeBtn = (i > 0) ? `<button data-email="${email}" class="remove-admin-btn text-red-500 hover:text-red-700 font-bold text-xl">&times;</button>` : `<i class="fa-solid fa-crown text-yellow-500" title="Super admin"></i>`; div.innerHTML = `<span>${email}</span>${removeBtn}`; ui.adminsList.appendChild(div); });
-            
+            admins.forEach((email, i) => {
+                const div = document.createElement('div');
+                div.className = 'flex justify-between items-center p-2 bg-gray-100 rounded-md';
+                const removeBtn = (i > 0) ? `<button data-email="${email}" class="remove-admin-btn text-red-500 hover:text-red-700 font-bold text-xl">&times;</button>` : `<i class="fa-solid fa-crown text-yellow-500" title="Super admin"></i>`;
+                div.innerHTML = `<span>${email}</span>${removeBtn}`;
+                ui.adminsList.appendChild(div);
+            });
+
             const partiesEnabled=settingsData?.partiesEnabled??true;
             ui.partiesAdminSection.style.display=partiesEnabled?'block':'none';
             ui.partySelectionContainer.style.display=partiesEnabled?'block':'none';
@@ -276,7 +261,7 @@
             
             ui.partiesList.innerHTML='';ui.partyTiles.innerHTML='';
             const nezavislyTile=document.createElement('button');nezavislyTile.className='tile p-2 rounded-lg bg-gray-200 hover:bg-gray-300';nezavislyTile.dataset.name='';nezavislyTile.textContent='Nezávislý';ui.partyTiles.appendChild(nezavislyTile);
-            if(parties.length===0){ui.partiesList.innerHTML='<p class="text-center text-gray-500">Žádné politické strany.</p>';}else{parties.forEach((p, i)=>{const d=document.createElement('div');d.className='party-item p-2 bg-gray-100 rounded-md space-y-2 cursor-grab'; d.dataset.name=p.name; d.draggable=true; d.innerHTML=`<div class="flex justify-between items-center"><span class="font-bold">${p.name}</span><button data-name="${p.name}" class="remove-party-btn text-red-500 hover:text-red-700 font-bold text-xl">&times;</button></div><div class="flex items-center gap-2"><select class="party-group-select w-full border rounded p-1 text-sm" data-index="${i}"><option value="Koalice" ${p.group==='Koalice'?'selected':''}>Koalice</option><option value="Opozice" ${p.group==='Opozice'?'selected':''}>Opozice</option><option value="Nezařazeno" ${p.group==='Nezařazeno'?'selected':''}>Nezařazeno</option></select><input type="color" value="${p.color||'#CCCCCC'}" class="party-color-input" data-index="${i}" title="Změnit barvu"></div>`;ui.partiesList.appendChild(d);const t=document.createElement('button');const o=isColorDark(p.color)?'text-white':'text-gray-800';t.className=`tile p-2 rounded-lg hover:opacity-80 ${o}`; t.style.backgroundColor=p.color||'#E5E7EB';t.dataset.name=p.name;t.textContent=p.name;ui.partyTiles.appendChild(t)})}
+            if(parties.length===0){ui.partiesList.innerHTML='<p class="text-center text-gray-500">Žádné politické strany.</p>';}else{parties.forEach(p=>{const d=document.createElement('div');d.className='flex justify-between items-center p-2 bg-gray-100 rounded-md';d.innerHTML=`<span>${p.name}</span><button data-name="${p.name}" class="remove-party-btn text-red-500 hover:text-red-700 font-bold text-xl">&times;</button>`;ui.partiesList.appendChild(d);const t=document.createElement('button');t.className='tile p-2 rounded-lg bg-gray-200 hover:bg-gray-300';t.dataset.name=p.name;t.textContent=p.name;ui.partyTiles.appendChild(t)})}
             
             handleTileSelection(ui.contributionTiles, ui.contributionTiles.children[0]?.dataset.name || null, false);
             handleTileSelection(ui.partyTiles, ui.partyTiles.children[0]?.dataset.name || null, true);
@@ -285,33 +270,39 @@
         async function setInitialData(){
             const docSnap=await getDoc(configDocRef);
             if(!docSnap.exists()){await setDoc(configDocRef,{settings:{signupsEnabled:true,partiesEnabled:true,
+            // NASTAV ZDE SVŮJ E-MAIL JAKO VÝCHOZÍHO ADMINA
             admins: ["gunka.daniel@gmail.com"],
-            types:[{name:"Standardní příspěvek",time:180,color:"#FFFFFF",maxSignups:null},{name:"Reakce",time:60,color:"#FED7D7",maxSignups:null},{name:"Faktická poznámka",time:30,color:"#BEE3F8",maxSignups:null}],parties:[{name:"Vládní strana",group:"Koalice",color:"#A0AEC0"},{name:"Opoziční strana",group:"Opozice",color:"#A0AEC0"}]},state:{currentSpeaker:null,timer:{timeRemaining:0,totalTime:0,isRunning:false}}})}
+            types:[{name:"Standardní příspěvek",time:180,color:"#FFFFFF",maxSignups:null},{name:"Reakce",time:60,color:"#FED7D7",maxSignups:null},{name:"Faktická poznámka",time:30,color:"#BEE3F8",maxSignups:null}],parties:[{name:"Vládní strana"},{name:"Opoziční strana"}]},state:{currentSpeaker:null,timer:{timeRemaining:0,totalTime:0,isRunning:false}}})}
         }
         
-        function setUiForAdmin(isAdminStatus) {
-            ui.adminNavBtn.style.display = isAdminStatus ? 'inline-block' : 'none';
-            ui.timerControls.style.display = isAdminStatus ? 'flex' : 'none';
-            if (!isAdminStatus) { ui.timerDisplay.style.cursor = 'default'; isDraggingTimer = false; } 
-            else { ui.timerDisplay.style.cursor = 'grab'; }
-            document.body.classList.toggle('is-admin', isAdminStatus);
+        function setUiForAdmin(isAdmin) {
+            ui.adminNavBtn.style.display = isAdmin ? 'inline-block' : 'none';
+            ui.timerControls.style.display = isAdmin ? 'flex' : 'none';
+            if (!isAdmin) {
+                ui.timerDisplay.style.cursor = 'default';
+                isDraggingTimer = false; 
+            } else {
+                ui.timerDisplay.style.cursor = 'grab';
+            }
         }
 
-        onAuthStateChanged(auth,user=>{if(user){currentUser=user;ui.authSection.style.display='none';ui.mainContent.style.display='flex';ui.userInfo.textContent=`Přihlášen jako: ${user.displayName||user.email}`;ui.speakerNameInput.value=localStorage.getItem('parliamentSpeakerName')||user.displayName||'';switchView('presenter');onSnapshot(configDocRef,doc=>{dbState=doc.data()||{};const{state={},settings={}}=dbState;isAdmin=settings.admins?.includes(user.email)??false;setUiForAdmin(isAdmin);renderSettings(settings);renderQueue(currentQueue);const c=settings.signupsEnabled??true;ui.signupsEnabledToggle.checked=c;ui.signupFormContainer.style.display=c?'block':'none';ui.signupsDisabledMessage.style.display=c?'none':'block';const s=state.currentSpeaker;ui.currentSpeakerName.textContent=s?.name||'- Nikdo -';ui.currentSpeakerTitle.textContent=s?.type||'Právě mluví';const t=state.timer||{};if(!isDraggingTimer){timeRemaining=t.timeRemaining??0;totalTime=t.totalTime??0;}updateTimerDisplay();if(t.isRunning&&!timerInterval){timerInterval=setInterval(()=>{if(timeRemaining>0){timeRemaining--;updateTimerDisplay()}else{if(timerInterval)clearInterval(timerInterval);timerInterval=null;if(dbState.state.timer.isRunning&&isAdmin)advanceToNextSpeaker()}},1e3)}else if(!t.isRunning&&timerInterval){clearInterval(timerInterval);timerInterval=null}ui.startTimerBtn.disabled=t.isRunning||timeRemaining<=0;ui.pauseTimerBtn.disabled=!t.isRunning});onSnapshot(query(queueRef),qSnap=>{currentQueue=qSnap.docs.map(d=>({...d.data(),id:d.id}));renderQueue(currentQueue)});setInitialData()}else{currentUser=null;isAdmin=false;setUiForAdmin(false);ui.authSection.style.display='block';ui.mainContent.style.display='none'}});
+        onAuthStateChanged(auth,user=>{if(user){currentUser=user;ui.authSection.style.display='none';ui.mainContent.style.display='flex';ui.userInfo.textContent=`Přihlášen jako: ${user.displayName||user.email}`;ui.speakerNameInput.value=localStorage.getItem('parliamentSpeakerName')||user.displayName||'';switchView('presenter');onSnapshot(configDocRef,doc=>{dbState=doc.data()||{};const{state={},settings={}}=dbState;isAdmin=settings.admins?.includes(user.email)??false;setUiForAdmin(isAdmin);renderSettings(settings);renderQueue(currentQueue);const c=settings.signupsEnabled??true;ui.signupsEnabledToggle.checked=c;ui.signupFormContainer.style.display=c?'block':'none';ui.signupsDisabledMessage.style.display=c?'none':'block';const s=state.currentSpeaker;ui.currentSpeakerName.textContent=s?.name||'- Nikdo -';ui.currentSpeakerTitle.textContent=s?.type||'Právě mluví';const t=state.timer||{};if(!isDraggingTimer){timeRemaining=t.timeRemaining??0;totalTime=t.totalTime??0;}updateTimerDisplay();if(t.isRunning&&!timerInterval){timerInterval=setInterval(()=>{if(timeRemaining>0){timeRemaining--;updateTimerDisplay()}else{if(timerInterval)clearInterval(timerInterval);timerInterval=null;if(dbState.state.timer.isRunning)advanceToNextSpeaker()}},1e3)}else if(!t.isRunning&&timerInterval){clearInterval(timerInterval);timerInterval=null}ui.startTimerBtn.disabled=t.isRunning||timeRemaining<=0;ui.pauseTimerBtn.disabled=!t.isRunning});onSnapshot(query(queueRef),qSnap=>{currentQueue=qSnap.docs.map(d=>({...d.data(),id:d.id}));renderQueue(currentQueue)});setInitialData()}else{currentUser=null;isAdmin=false;setUiForAdmin(false);ui.authSection.style.display='block';ui.mainContent.style.display='none'}});
         
         ui.loginBtn.addEventListener('click',()=>signInWithPopup(auth,provider).catch(err=>showModal(`Přihlášení selhalo: ${err.message}`)));
         ui.logoutBtn.addEventListener('click',()=>signOut(auth));
+        
         ui.navBtns.forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.view)));
-        ui.signupBtn.addEventListener('click',async()=>{try{const name=ui.speakerNameInput.value.trim();localStorage.setItem('parliamentSpeakerName',name);const isDuplicate=currentQueue.some(s=>s.name.toLowerCase()===name.toLowerCase()&&s.type===selectedContribution);if(isDuplicate){throw new Error(`Řečník <b>${name}</b> je již přihlášen s tímto typem příspěvku.`);}await runTransaction(db,async t=>{const c=await t.get(configDocRef),q=await getDocs(query(queueRef));const typeSetting=dbState.settings?.types.find(s=>s.name===selectedContribution);if(typeSetting?.maxSignups!=null){const qSnap=await getDocs(query(queueRef,where("type","==",selectedContribution)));if(qSnap.size>=typeSetting.maxSignups)throw new Error(`Byl dosažen maximální počet přihlášek pro tento typ.`);}if(q.empty&&!c.data().state.currentSpeaker){const n=typeSetting?.time??0;t.update(configDocRef,{"state.currentSpeaker":{name,type:selectedContribution,party:selectedParty},"state.timer":{timeRemaining:n,totalTime:n,isRunning:false}})}else{t.set(doc(collection(db,"artifacts",appId,"public/data/queue")),{name,type:selectedContribution,party:selectedParty,timestamp:new Date()})}});showModal("Úspěšně přihlášen/a.");ui.speakerNameInput.value='';switchView('presenter');}catch(e){showModal(e.message||"Přihlášení selhalo.")}});
+        ui.signupBtn.addEventListener('click',async()=>{try{const name=ui.speakerNameInput.value.trim();if(!name){return showModal("Vyplňte prosím jméno.")}localStorage.setItem('parliamentSpeakerName',name);const isDuplicate=currentQueue.some(speaker=>speaker.name.toLowerCase()===name.toLowerCase()&&speaker.type===selectedContribution);if(isDuplicate){throw new Error(`Řečník <b>${name}</b> je již přihlášen s tímto typem příspěvku.`);}await runTransaction(db,async t=>{const c=await t.get(configDocRef),q=await getDocs(query(queueRef));const typeSetting=dbState.settings?.types.find(s=>s.name===selectedContribution);if(typeSetting?.maxSignups!=null){const qSnap=await getDocs(query(queueRef,where("type","==",selectedContribution)));if(qSnap.size>=typeSetting.maxSignups)throw new Error(`Byl dosažen maximální počet přihlášek pro tento typ.`);}if(q.empty&&!c.data().state.currentSpeaker){const n=typeSetting?.time??0;t.update(configDocRef,{"state.currentSpeaker":{name,type:selectedContribution,party:selectedParty},"state.timer":{timeRemaining:n,totalTime:n,isRunning:false}})}else{t.set(doc(collection(db,"artifacts",appId,"public/data/queue")),{name,type:selectedContribution,party:selectedParty,timestamp:new Date()})}});showModal("Úspěšně přihlášen/a.");ui.speakerNameInput.value='';switchView('presenter');}catch(e){showModal(e.message||"Přihlášení selhalo.")}});
+        
         const handleTileSelection=(container,value,isParty)=>{if(isParty){selectedParty=value;}else{selectedContribution=value;}[...container.children].forEach(t=>t.classList.toggle('selected',t.dataset.name===value));updateSignupButtonState();};
         ui.partyTiles.addEventListener('click',e=>{if(e.target.matches('.tile'))handleTileSelection(ui.partyTiles,e.target.dataset.name,true)});
         ui.contributionTiles.addEventListener('click',e=>{if(e.target.matches('.tile'))handleTileSelection(ui.contributionTiles,e.target.dataset.name,false)});
         ui.speakerNameInput.addEventListener('input', updateSignupButtonState);
+
         ui.addSettingBtn.addEventListener('click',async()=>{const n=ui.newSettingName.value.trim(),t=parseInt(ui.newSettingTime.value),c=ui.newSettingColor.value;if(!n||isNaN(t)||t<=0)return showModal("Zadejte platný název a čas > 0.");const s=[...(dbState.settings?.types||[])];if(s.some(x=>x.name===n))return showModal("Tento typ již existuje.");await updateDoc(configDocRef,{"settings.types":[...s,{name:n,time:t,color:c,maxSignups:null}]});ui.newSettingName.value='';ui.newSettingTime.value='';ui.newSettingColor.value='#FFFFFF'});
         ui.settingsList.addEventListener('input',async e=>{if(!e.target.matches('.setting-color-input, .setting-max-input'))return;const i=e.target.dataset.index,s=[...dbState.settings.types];if(e.target.matches('.setting-color-input'))s[i].color=e.target.value;if(e.target.matches('.setting-max-input'))s[i].maxSignups=e.target.value===''?null:parseInt(e.target.value,10);await updateDoc(configDocRef,{"settings.types":s})});
         ui.settingsList.addEventListener('click',async e=>{if(e.target.classList.contains('remove-setting-btn')){const n=e.target.dataset.name;await updateDoc(configDocRef,{"settings.types":dbState.settings.types.filter(s=>s.name!==n)})}});
-        ui.addPartyBtn.addEventListener('click',async()=>{const n=ui.newPartyNameInput.value.trim();if(!n)return;const p=[...(dbState.settings?.parties||[])];if(p.some(x=>x.name===n))return showModal("Tato strana již existuje.");await updateDoc(configDocRef,{"settings.parties":[...p,{name:n,group:'Nezařazeno',color:'#CCCCCC'}]});ui.newPartyNameInput.value=''});
-        ui.partiesList.addEventListener('input',async e=>{if(!e.target.matches('.party-color-input, .party-group-select'))return;const i=e.target.dataset.index,p=[...dbState.settings.parties];if(e.target.matches('.party-color-input'))p[i].color=e.target.value;if(e.target.matches('.party-group-select'))p[i].group=e.target.value;await updateDoc(configDocRef,{"settings.parties":p})});
+        ui.addPartyBtn.addEventListener('click',async()=>{const n=ui.newPartyNameInput.value.trim();if(!n)return;const p=[...(dbState.settings?.parties||[])];if(p.some(x=>x.name===n))return showModal("Tato strana již existuje.");await updateDoc(configDocRef,{"settings.parties":[...p,{name:n}]});ui.newPartyNameInput.value=''});
         ui.partiesList.addEventListener('click',async e=>{if(e.target.classList.contains('remove-party-btn')){const n=e.target.dataset.name;await updateDoc(configDocRef,{"settings.parties":dbState.settings.parties.filter(p=>p.name!==n)})}});
         $$('.collapsible-trigger').forEach(t=>t.addEventListener('click',()=>{t.nextElementSibling.classList.toggle('hidden');t.querySelector('i').classList.toggle('rotate-180')}));
         ui.adminSpeakerList.addEventListener('click',e=>{if(isAdmin&&e.target.matches('.remove-speaker-btn'))deleteDoc(doc(queueRef,e.target.dataset.id))});
@@ -322,17 +313,17 @@
         ui.resetTimerBtn.addEventListener('click',resetTimer);
         ui.signupsEnabledToggle.addEventListener('change',e=>updateDoc(configDocRef,{"settings.signupsEnabled":e.target.checked}));
         ui.partiesEnabledToggle.addEventListener('change',e=>updateDoc(configDocRef,{"settings.partiesEnabled":e.target.checked}));
-        ui.fullscreenBtn.addEventListener('click',()=>document.body.classList.add('fullscreen'));
-        ui.exitFullscreenBtn.addEventListener('click',()=>document.body.classList.remove('fullscreen'));
+        ui.fullscreenBtn.addEventListener('click', () => document.body.classList.add('fullscreen'));
+        ui.exitFullscreenBtn.addEventListener('click', () => document.body.classList.remove('fullscreen'));
         ui.addAdminBtn.addEventListener('click',async()=>{const e=ui.newAdminEmail.value.trim();if(!e)return;const a=[...(dbState.settings?.admins||[])];if(a.includes(e))return showModal("Tento uživatel již je administrátor.");await updateDoc(configDocRef,{"settings.admins":[...a,e]});ui.newAdminEmail.value=''});
         ui.adminsList.addEventListener('click',async e=>{if(e.target.classList.contains('remove-admin-btn')){const t=e.target.dataset.email;await updateDoc(configDocRef,{"settings.admins":dbState.settings.admins.filter(a=>a!==t)})}});
-        let draggedItem=null;const dnd=(list,key)=>{list.addEventListener('dragstart',e=>{draggedItem=e.target;e.target.classList.add('dragging')});list.addEventListener('dragend',e=>{e.target.classList.remove('dragging');draggedItem=null});list.addEventListener('dragover',e=>{e.preventDefault();const a=getDragAfterElement(list,e.clientY);if(a==null){list.appendChild(draggedItem)}else{list.insertBefore(draggedItem,a)}});list.addEventListener('drop',async e=>{e.preventDefault();const n=[...list.querySelectorAll(`.${key}-item`)].map(i=>i.dataset.name),s=n.map(name=>dbState.settings[key].find(x=>x.name===name));await updateDoc(configDocRef,{[`settings.${key}`]:s})});}
-        dnd(ui.settingsList, 'types'); dnd(ui.partiesList, 'parties');
-        function getDragAfterElement(c,y){const d=[...c.querySelectorAll('.setting-item:not(.dragging), .party-item:not(.dragging)')];return d.reduce((closest,child)=>{const b=child.getBoundingClientRect(),o=y-b.top-b.height/2;return(o<0&&o>closest.offset)?{offset:o,element:child}:closest},{offset:Number.NEGATIVE_INFINITY}).element}
+        let draggedItem=null;ui.settingsList.addEventListener('dragstart',e=>{draggedItem=e.target;e.target.classList.add('dragging')});ui.settingsList.addEventListener('dragend',e=>{e.target.classList.remove('dragging');draggedItem=null});ui.settingsList.addEventListener('dragover',e=>{e.preventDefault();const a=getDragAfterElement(ui.settingsList,e.clientY);if(a==null){ui.settingsList.appendChild(draggedItem)}else{ui.settingsList.insertBefore(draggedItem,a)}});
+        ui.settingsList.addEventListener('drop',async e=>{e.preventDefault();const n=[...ui.settingsList.querySelectorAll('.setting-item')].map(i=>i.dataset.name),s=n.map(name=>dbState.settings.types.find(x=>x.name===name));await updateDoc(configDocRef,{'settings.types':s})});
+        function getDragAfterElement(c,y){const d=[...c.querySelectorAll('.setting-item:not(.dragging)')];return d.reduce((closest,child)=>{const b=child.getBoundingClientRect(),o=y-b.top-b.height/2;return(o<0&&o>closest.offset)?{offset:o,element:child}:closest},{offset:Number.NEGATIVE_INFINITY}).element}
         const handleTimerDrag=(e)=>{if(!isDraggingTimer||totalTime<=0||!isAdmin)return;e.preventDefault();const r=ui.timerDisplay.getBoundingClientRect(),x=e.touches?e.touches[0].clientX:e.clientX,y=e.touches?e.touches[0].clientY:e.clientY,a=Math.atan2(y-(r.top+r.height/2),x-(r.left+r.width/2))+Math.PI/2;timeRemaining=Math.round((a<0?a+2*Math.PI:a)/(2*Math.PI)*totalTime);updateTimerDisplay()};
         const startDrag=()=>{if(totalTime>0&&isAdmin){isDraggingTimer=true;ui.timerDisplay.style.cursor='grabbing';if(dbState.state?.timer?.isRunning)updateDoc(configDocRef,{"state.timer.isRunning":false})}};
         const stopDrag=()=>{if(isDraggingTimer&&isAdmin){isDraggingTimer=false;ui.timerDisplay.style.cursor='grab';updateDoc(configDocRef,{"state.timer.timeRemaining":timeRemaining})}};
         ui.timerDisplay.addEventListener('mousedown',startDrag);document.addEventListener('mousemove',handleTimerDrag);document.addEventListener('mouseup',stopDrag);ui.timerDisplay.addEventListener('touchstart',startDrag);document.addEventListener('touchmove',handleTimerDrag);document.addEventListener('touchend',stopDrag);
     </script>
 </body>
-</ht
+</html>
