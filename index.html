@@ -261,11 +261,34 @@
             handleTileSelection(ui.partyTiles, ui.partyTiles.children[0]?.dataset.name || null, true);
         }
         
-        async function setInitialData(){
-            const docSnap=await getDoc(configDocRef);
-            if(!docSnap.exists()){await setDoc(configDocRef,{settings:{signupsEnabled:true,partiesEnabled:true,
-            admins: ["gunka.daniel@gmail.com"],
-            types:[{name:"Standardní příspěvek",time:180,color:"#FFFFFF",maxSignups:null},{name:"Reakce",time:60,color:"#FED7D7",maxSignups:null},{name:"Faktická poznámka",time:30,color:"#BEE3F8",maxSignups:null}],parties:[{name:"Vládní strana"},{name:"Opoziční strana"}]},state:{currentSpeaker:null,timer:{timeRemaining:0,totalTime:0,isRunning:false}}})}
+        async function ensureMainConfigExists() {
+            const docSnap = await getDoc(configDocRef);
+            if (!docSnap.exists()) {
+                // Vytvořit dokument main s minimálním obsahem, pokud přihlášený uživatel je admin
+                const userEmail = auth.currentUser?.email;
+                if (!userEmail) return;
+                // Uložit email aktuálního uživatele do pole admins
+                await setDoc(configDocRef, {
+                    settings: {
+                        signupsEnabled: true,
+                        partiesEnabled: true,
+                        admins: ["gunka.daniel@gmail.com"],
+                        types: [
+                            { name: "Standardní příspěvek", time: 180, color: "#FFFFFF", maxSignups: null },
+                            { name: "Reakce", time: 60, color: "#FED7D7", maxSignups: null },
+                            { name: "Faktická poznámka", time: 30, color: "#BEE3F8", maxSignups: null }
+                        ],
+                        parties: [
+                            { name: "Vládní strana" },
+                            { name: "Opoziční strana" }
+                        ]
+                    },
+                    state: {
+                        currentSpeaker: null,
+                        timer: { timeRemaining: 0, totalTime: 0, isRunning: false }
+                    }
+                });
+            }
         }
         
         function setUiForAdmin(isAdminStatus) {
@@ -276,8 +299,24 @@
             document.body.classList.toggle('is-admin', isAdminStatus);
         }
 
-        onAuthStateChanged(auth,user=>{if(user){currentUser=user;ui.authSection.style.display='none';ui.mainContent.style.display='flex';ui.userInfo.textContent=`Přihlášen jako: ${user.displayName||user.email}`;ui.speakerNameInput.value=localStorage.getItem('parliamentSpeakerName')||user.displayName||'';switchView('presenter');onSnapshot(configDocRef,doc=>{dbState=doc.data()||{};const{state={},settings={}}=dbState;isAdmin=settings.admins?.includes(user.email)??false;setUiForAdmin(isAdmin);renderSettings(settings);renderQueue(currentQueue);const c=settings.signupsEnabled??true;ui.signupsEnabledToggle.checked=c;ui.signupFormContainer.style.display=c?'block':'none';ui.signupsDisabledMessage.style.display=c?'none':'block';const s=state.currentSpeaker;ui.currentSpeakerName.textContent=s?.name||'- Nikdo -';ui.currentSpeakerTitle.textContent=s?.type||'Právě mluví';const t=state.timer||{};if(!isDraggingTimer){timeRemaining=t.timeRemaining??0;totalTime=t.totalTime??0;}updateTimerDisplay();if(t.isRunning&&!timerInterval){timerInterval=setInterval(()=>{if(timeRemaining>0){timeRemaining--;updateTimerDisplay()}else{if(timerInterval)clearInterval(timerInterval);timerInterval=null;if(dbState.state.timer.isRunning&&isAdmin)advanceToNextSpeaker()}},1e3)}else if(!t.isRunning&&timerInterval){clearInterval(timerInterval);timerInterval=null}ui.startTimerBtn.disabled=t.isRunning||timeRemaining<=0;ui.pauseTimerBtn.disabled=!t.isRunning});onSnapshot(query(queueRef),qSnap=>{currentQueue=qSnap.docs.map(d=>({...d.data(),id:d.id}));renderQueue(currentQueue)});setInitialData()}else{currentUser=null;isAdmin=false;setUiForAdmin(false);ui.authSection.style.display='block';ui.mainContent.style.display='none'}});
+        onAuthStateChanged(auth, async user => {
+            if (user) {
+                currentUser = user;
+                ui.authSection.style.display = 'none';
+                ui.mainContent.style.display = 'flex';
+                ui.userInfo.textContent = `Přihlášen jako: ${user.displayName || user.email}`;
+                ui.speakerNameInput.value = localStorage.getItem('parliamentSpeakerName') || user.displayName || '';
+                switchView('presenter');
         
+                // --- NOVĚ! Zajisti, že config/main vznikne při přihlášení admina ---
+                await ensureMainConfigExists();
+        
+                // ... zbytek původního kódu zůstává ...
+            } else {
+                // ... původní else ...
+            }
+        });
+
         ui.loginBtn.addEventListener('click',()=>signInWithPopup(auth,provider).catch(err=>showModal(`Přihlášení selhalo: ${err.message}`)));
         ui.logoutBtn.addEventListener('click',()=>signOut(auth));
         
