@@ -105,13 +105,15 @@
             <div id="admin-view" class="view p-4 bg-white rounded-lg shadow-md flex-grow">
                  <div class="grid md:grid-cols-2 gap-4 h-full">
                     <div class="bg-gray-50 p-4 rounded-lg flex flex-col min-h-0">
+                        <h2 class="text-2xl font-bold mb-4 flex-shrink-0">Správa pořadníku</h2>
                         <button id="next-speaker-btn" class="w-full mb-4 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg disabled:bg-gray-400 flex-shrink-0"><i class="fa-solid fa-arrow-right-to-bracket mr-2"></i> POSUNOUT DALŠÍHO</button>
                         <div class="scrollable-list-container"><ul id="admin-speaker-list" class="space-y-2 scrollable-list pr-2"></ul></div>
                     </div>
                     <div class="bg-gray-50 p-4 rounded-lg flex flex-col min-h-0">
+                        <h2 class="text-2xl font-bold mb-4 flex-shrink-0">Nastavení</h2>
                         <div class="grid grid-cols-2 gap-4 mb-4 flex-shrink-0">
-                            <div class="p-3 border rounded-lg bg-white flex items-center justify-between"><label for="signups-enabled-toggle" class="flex items-center cursor-pointer w-full justify-between"><span class="font-semibold text-gray-700 mr-3">Přihlašování</span><div class="relative"><input type="checkbox" id="signups-enabled-toggle" class="toggle-checkbox"><label for="signups-enabled-toggle" class="toggle-label"><div class="dot"></div></label></div></label></div>
-                            <div class="p-3 border rounded-lg bg-white flex items-center justify-between"><label for="parties-enabled-toggle" class="flex items-center cursor-pointer w-full justify-between"><span class="font-semibold text-gray-700 mr-3">Strany</span><div class="relative"><input type="checkbox" id="parties-enabled-toggle" class="toggle-checkbox"><label for="parties-enabled-toggle" class="toggle-label"><div class="dot"></div></label></div></label></div>
+                            <div class="p-3 border rounded-lg bg-white flex items-center justify-between"><label for="signups-enabled-toggle" class="flex items-center cursor-pointer w-full justify-between"><span class="font-semibold text-gray-700 mr-3">Povolit přihlašování</span><div class="relative"><input type="checkbox" id="signups-enabled-toggle" class="toggle-checkbox"><label for="signups-enabled-toggle" class="toggle-label"><div class="dot"></div></label></div></label></div>
+                            <div class="p-3 border rounded-lg bg-white flex items-center justify-between"><label for="parties-enabled-toggle" class="flex items-center cursor-pointer w-full justify-between"><span class="font-semibold text-gray-700 mr-3">Povolit strany</span><div class="relative"><input type="checkbox" id="parties-enabled-toggle" class="toggle-checkbox"><label for="parties-enabled-toggle" class="toggle-label"><div class="dot"></div></label></div></label></div>
                         </div>
                         <div class="scrollable-list-container"><div class="scrollable-list pr-2 space-y-4">
                             <div class="collapsible-section">
@@ -251,9 +253,9 @@
                 if(i===0){presLi.classList.add(isAdmin?'cursor-pointer':'','border-4');presLi.style.borderColor=darkenColor(bgColor,0.2);presLi.id='next-speaker-tile';presLi.title=isAdmin?"Kliknutím přesunout do prezentace":"";}
                 const partyInfo = (settings.partiesEnabled) ? `(${(speaker.party || 'Nezávislý')})` : '';
                 presLi.innerHTML=`<p class="font-semibold">${speaker.name} <span class="text-sm opacity-75 font-normal">${partyInfo}</span></p>`;
-                list.appendChild(presLi);
+                if(list) list.appendChild(presLi);
             });
-            Object.values(cols).forEach(col => { if(!col.hasChildNodes()) col.innerHTML = '<li class="p-3 text-center text-gray-400 text-sm">Prázdné</li>'; });
+            Object.values(cols).forEach(col => { if(col && !col.hasChildNodes()) col.innerHTML = '<li class="p-3 text-center text-gray-400 text-sm">Prázdné</li>'; });
 
             ui.queueSummary.innerHTML=`<span><i class="fa-solid fa-users mr-1"></i> ${sorted.length}</span><span class="ml-4"><i class="fa-solid fa-clock mr-1"></i> ~${Math.ceil(totalQueueTime/60)} min</span>`;ui.nextSpeakerBtn.disabled=sorted.length===0;
         }
