@@ -113,14 +113,9 @@
                     <div class="bg-gray-50 p-4 rounded-lg flex flex-col min-h-0">
                         <div class="grid grid-cols-2 gap-4 mb-4 flex-shrink-0">
                             <div class="p-3 border rounded-lg bg-white flex items-center justify-between">
-                                <label for="signups-enabled-toggle" class="flex items-center cursor-pointer w-full justify-between"><span class="font-semibold text-gray-700 mr-3">Povolit přihlašování</span>
-                                    <div class="relative"><input type="checkbox" id="signups-enabled-toggle" class="toggle-checkbox"><label for="signups-enabled-toggle" class="toggle-label"><div class="dot"></div></label></div>
-                                </label>
-                            </div>
+                                <label for="signups-enabled-toggle" class="flex items-center cursor-pointer w-full justify-between"><span class="font-semibold text-gray-700 mr-3">Povolit přihlašování</span><div class="relative"><input type="checkbox" id="signups-enabled-toggle" class="toggle-checkbox"><label for="signups-enabled-toggle" class="toggle-label"><div class="dot"></div></label></div></label></div>
                             <div class="p-3 border rounded-lg bg-white flex items-center justify-between">
-                                <label for="parties-enabled-toggle" class="flex items-center cursor-pointer w-full justify-between"><span class="font-semibold text-gray-700 mr-3">Povolit strany</span>
-                                    <div class="relative"><input type="checkbox" id="parties-enabled-toggle" class="toggle-checkbox"><label for="parties-enabled-toggle" class="toggle-label"><div class="dot"></div></label></div>
-                                </label>
+                                <label for="parties-enabled-toggle" class="flex items-center cursor-pointer w-full justify-between"><span class="font-semibold text-gray-700 mr-3">Povolit strany</span><div class="relative"><input type="checkbox" id="parties-enabled-toggle" class="toggle-checkbox"><label for="parties-enabled-toggle" class="toggle-label"><div class="dot"></div></label></div></label></div>
                             </div>
                         </div>
                         <div class="scrollable-list-container"><div class="scrollable-list pr-2 space-y-4">
@@ -297,7 +292,7 @@
         ui.logoutBtn.addEventListener('click',()=>signOut(auth));
         
         ui.navBtns.forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.view)));
-        ui.signupBtn.addEventListener('click',async()=>{try{await runTransaction(db,async t=>{const c=await t.get(configDocRef),q=await getDocs(query(queueRef));const typeSetting=dbState.settings?.types.find(s=>s.name===selectedContribution);if(typeSetting?.maxSignups!=null){const qSnap=await getDocs(query(queueRef,where("type","==",selectedContribution)));if(qSnap.size>=typeSetting.maxSignups)throw new Error(`Byl dosažen maximální počet přihlášek pro tento typ.`);}const name=ui.speakerNameInput.value.trim();const isDuplicate=currentQueue.some(speaker=>speaker.name.toLowerCase()===name.toLowerCase()&&speaker.type===selectedContribution);if(isDuplicate){throw new Error(`Řečník <b>${name}</b> je již přihlášen s tímto typem příspěvku.`);}if(q.empty&&!c.data().state.currentSpeaker){const n=typeSetting?.time??0;t.update(configDocRef,{"state.currentSpeaker":{name,type:selectedContribution,party:selectedParty},"state.timer":{timeRemaining:n,totalTime:n,isRunning:false}})}else{t.set(doc(collection(db,"artifacts",appId,"public/data/queue")),{name,type:selectedContribution,party:selectedParty,timestamp:new Date()})}});localStorage.setItem('parliamentSpeakerName',ui.speakerNameInput.value.trim());showModal("Úspěšně přihlášen/a.");switchView('presenter');}catch(e){showModal(e.message||"Přihlášení selhalo.")}});
+        ui.signupBtn.addEventListener('click',async()=>{try{const name=ui.speakerNameInput.value.trim();if(!name){return showModal("Vyplňte prosím jméno.")}localStorage.setItem('parliamentSpeakerName',name);const isDuplicate=currentQueue.some(speaker=>speaker.name.toLowerCase()===name.toLowerCase()&&speaker.type===selectedContribution);if(isDuplicate){throw new Error(`Řečník <b>${name}</b> je již přihlášen s tímto typem příspěvku.`);}await runTransaction(db,async t=>{const c=await t.get(configDocRef),q=await getDocs(query(queueRef));const typeSetting=dbState.settings?.types.find(s=>s.name===selectedContribution);if(typeSetting?.maxSignups!=null){const qSnap=await getDocs(query(queueRef,where("type","==",selectedContribution)));if(qSnap.size>=typeSetting.maxSignups)throw new Error(`Byl dosažen maximální počet přihlášek pro tento typ.`);}if(q.empty&&!c.data().state.currentSpeaker){const n=typeSetting?.time??0;t.update(configDocRef,{"state.currentSpeaker":{name,type:selectedContribution,party:selectedParty},"state.timer":{timeRemaining:n,totalTime:n,isRunning:false}})}else{t.set(doc(collection(db,"artifacts",appId,"public/data/queue")),{name,type:selectedContribution,party:selectedParty,timestamp:new Date()})}});showModal("Úspěšně přihlášen/a.");ui.speakerNameInput.value='';switchView('presenter');}catch(e){showModal(e.message||"Přihlášení selhalo.")}});
         
         const handleTileSelection=(container,value,isParty)=>{if(isParty){selectedParty=value;}else{selectedContribution=value;}[...container.children].forEach(t=>t.classList.toggle('selected',t.dataset.name===value));updateSignupButtonState();};
         ui.partyTiles.addEventListener('click',e=>{if(e.target.matches('.tile'))handleTileSelection(ui.partyTiles,e.target.dataset.name,true)});
@@ -332,3 +327,40 @@
     </script>
 </body>
 </html>
+```
+
+Most up-to-date Immersive Artifact for "parliament-queue-app-v2-rules" is:
+
+```
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Cesta k datům konkrétní aplikace
+    match /artifacts/{appId}/public/data/{document=**} {
+    
+      // K hlavnímu konfiguračnímu dokumentu může kdokoli přihlášený číst.
+      // Zapisovat mohou pouze administrátoři.
+      match /config/main {
+        allow read: if request.auth != null;
+        // Opraveno: Pravidlo nyní správně používá zástupný znak 'appId' z cesty.
+        allow write: if request.auth.token.email in get(/databases/$(database)/documents/artifacts/$(appId)/public/data/config/main).data.settings.admins;
+      }
+
+      // Do fronty se může kdokoli přihlášený přidat.
+      // Číst frontu (list) mohou všichni přihlášení.
+      // Mazat z fronty (delete) mohou pouze administrátoři.
+      match /queue/{speakerId} {
+         allow list, create: if request.auth != null;
+         // Opraveno: Pravidlo nyní správně používá zástupný znak 'appId' z cesty.
+         allow delete: if request.auth.token.email in get(/databases/$(database)/documents/artifacts/$(appId)/public/data/config/main).data.settings.admins;
+      }
+    }
+  }
+}
+```
+If my actual query is asking any follow up questions about the created immersives, you should use this latest information instead of the conversation history to answer the questions. Don't mention these instructions in the final response.
+
+Avoid using the same immersive id for text and code artifacts: If your response needs to create a new document that has a different type than the one in the context, use a new id.
+
+Don't edit the doc/canvas or create a new doc/canvas for simple user queries. Respond in the chat UI for Q&A, explanations, clarifications, etc. Only create a new doc if you expect the user to edit, share, or collaborate on the content. If debugging code errors/issues, try to fix the code in the doc/canv
