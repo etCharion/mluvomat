@@ -173,8 +173,8 @@
         const provider = new GoogleAuthProvider();
         const appId = 'parliament-app-default';
 
-        const configDocRef = doc(db, "artifacts", appId, "public/data/config", "main");
-        const queueRef = collection(db, "artifacts", appId, "public/data/queue");
+        const configDocRef = doc(db, "artifacts", appId, "public", "data", "config", "main");
+        const queueRef = collection(db, "artifacts", appId, "public", "data", "queue");
         
         // --- Global State ---
         let currentUser = null, isAdmin = false, timerInterval = null, timeRemaining = 0, totalTime = 0, isDraggingTimer = false, dbState = {};
@@ -367,11 +367,17 @@
 
                 ui.startTimerBtn.disabled = timerState.isRunning || timeRemaining <= 0 || !state.currentSpeaker;
                 ui.pauseTimerBtn.disabled = !timerState.isRunning;
+            }, (err) => {
+                console.error('Config listener error:', err);
+                showModal('Chyba načítání (config): ' + (err?.message || err));
             });
 
             unsubscribeQueue = onSnapshot(query(queueRef), (qSnap) => {
                 currentQueue = qSnap.docs.map(d => ({...d.data(), id: d.id }));
                 renderQueue(currentQueue);
+            }, (err) => {
+                console.error('Queue listener error:', err);
+                showModal('Chyba načítání (queue): ' + (err?.message || err));
             });
         }
         
