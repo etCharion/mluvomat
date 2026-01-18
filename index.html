@@ -170,7 +170,7 @@
 
                             <div class="bg-gray-50 border rounded-lg p-4 flex flex-col min-h-0">
                                 <h3 class="font-bold mb-3">Vizualizace</h3>
-                                <div id="vote-viz" class="flex-grow min-h-0"></div>
+                                <div id="vote-viz" class="flex-grow min-h-0 overflow-hidden"></div>
                             </div>
                         </div>
 
@@ -296,6 +296,7 @@
         let votes = [], selectedVoteId = null, voteStyle = 'bars';
         let voteResponses = [], myVote = null;
         let unsubscribeConfig, unsubscribeQueue, unsubscribeVotes, unsubscribeVoteResponses; // To hold listener unsub functions
+        let votesListenerMode = null; // 'admin' | 'user'
 
         // --- UI Element Query Selector ---
         const $ = (selector) => document.querySelector(selector);
@@ -563,18 +564,26 @@
         }
 
         function renderPastVotesButtons(){
-            const visible = getVisibleVotes().slice().sort((a,b)=> (b.createdAt?.toMillis?.()||0)-(a.createdAt?.toMillis?.()||0));
+            const list = (isAdmin ? (votes || []) : getVisibleVotes())
+                .slice()
+                .sort((a,b)=> (b.createdAt?.toMillis?.()||0)-(a.createdAt?.toMillis?.()||0));
             const active = getActiveVote();
-            const past = visible.filter(v => !active || v.id !== active.id);
             ui.pastVotes.innerHTML = '';
-            if (past.length === 0) {
-                ui.pastVotes.innerHTML = '<span class="text-sm text-gray-500">Žádná předchozí hlasování.</span>';
+            if (list.length === 0) {
+                ui.pastVotes.innerHTML = '<span class="text-sm text-gray-500">Žádná hlasování.</span>';
                 return;
             }
-            past.forEach(v => {
+            list.forEach(v => {
                 const btn = document.createElement('button');
-                btn.className = 'px-3 py-2 rounded-md bg-gray-200 hover:bg-gray-300 text-sm';
-                btn.textContent = v.topic || '(bez tématu)';
+                const isActive = !!active && v.id === active.id;
+                const isSelected = !!selectedVoteId && v.id === selectedVoteId;
+
+                const base = 'px-3 py-2 rounded-md text-sm transition';
+                const selectedCls = isSelected ? ' bg-blue-600 text-white hover:bg-blue-700' : ' bg-gray-200 hover:bg-gray-300 text-gray-800';
+                const activeCls = isActive ? ' ring-2 ring-green-500' : '';
+
+                btn.className = base + selectedCls + activeCls;
+                btn.textContent = (v.topic || '(bez tématu)') + (isActive ? ' • AKTIVNÍ' : '');
                 btn.dataset.voteId = v.id;
                 ui.pastVotes.appendChild(btn);
             });
@@ -887,53 +896,48 @@
             document.body.classList.toggle('is-admin', isAdminStatus);
         }
 
-	        // Votes listener must be role-aware. Non-admin users are only allowed to read votes where visible == true.
-	        // Firestore will reject an unfiltered collection listener if some docs are not readable.
-	        let _votesListenerMode = null; // 'admin' | 'user'
-	        async function restartVotesListener() {
-	            const mode = isAdmin ? 'admin' : 'user';
-	            if (_votesListenerMode === mode && unsubscribeVotes) return;
-	            _votesListenerMode = mode;
-	            if (unsubscribeVotes) unsubscribeVotes();
-	            // Build query depending on role
-	            const q = isAdmin
-	                ? query(votesRef, orderBy('createdAt', 'desc'))
-	                : query(votesRef, where('visible', '==', true), orderBy('createdAt', 'desc'));
-	            unsubscribeVotes = onSnapshot(q, async (vSnap) => {
-	                votes = vSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-	                updateVotingNavVisibility();
-	                const active = getActiveVote();
-	                // pokud je aktivní hlasování, přepneme se na něj (pokud uživatel nemá vybranou jinou volbu)
-	                if (!selectedVoteId && active) selectedVoteId = active.id;
-	                if (selectedVoteId && !votes.some(v => v.id === selectedVoteId)) selectedVoteId = active?.id || votes[0]?.id || null;
-	                await startVoteResponsesListener(selectedVoteId);
-	                renderVoting();
-	                renderVotesAdmin();
-	            }, (err) => {
-	                console.error('Votes listener error:', err);
-	                showModal('Chyba načítání hlasování: ' + (err?.message || err));
-	            });
-	        }
+        function restartVotesListenerIfNeeded(){
+            const mode = isAdmin ? 'admin' : 'user';
+            if (votesListenerMode === mode && unsubscribeVotes) return;
+            votesListenerMode = mode;
+            if (unsubscribeVotes) unsubscribeVotes();
+
+            const baseQuery = isAdmin
+                ? query(votesRef, orderBy('createdAt','desc'))
+                : query(votesRef, where('visible','==', true), orderBy('createdAt','desc'));
+
+            unsubscribeVotes = onSnapshot(baseQuery, async (vSnap) => {
+                votes = vSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+                updateVotingNavVisibility();
+                const active = getActiveVote();
+                if (!selectedVoteId && active) selectedVoteId = active.id;
+                if (selectedVoteId && !votes.some(v => v.id === selectedVoteId)) selectedVoteId = active?.id || votes[0]?.id || null;
+                await startVoteResponsesListener(selectedVoteId);
+                renderVoting();
+                renderVotesAdmin();
+            }, (err) => {
+                console.error('Votes listener error:', err);
+                showModal('Chyba načítání hlasování: ' + (err?.message || err));
+            });
+        }
 
         function startListeners() {
              // Zastavíme staré posluchače, pokud existují
             if (unsubscribeConfig) unsubscribeConfig();
             if (unsubscribeQueue) unsubscribeQueue();
-	            if (unsubscribeVotes) unsubscribeVotes();
+            if (unsubscribeVotes) unsubscribeVotes();
             if (unsubscribeVoteResponses) unsubscribeVoteResponses();
             
-	            unsubscribeConfig = onSnapshot(configDocRef, (doc) => {
+            unsubscribeConfig = onSnapshot(configDocRef, (doc) => {
                 if (!doc.exists()) return;
                 dbState = doc.data() || {};
                 const { state = {}, settings = {} } = dbState;
 
-	                const prevIsAdmin = isAdmin;
-	                isAdmin = settings.admins?.includes(currentUser?.email) ?? false;
+                isAdmin = settings.admins?.includes(currentUser?.email) ?? false;
                 setUiForAdmin(isAdmin);
-	                // If role changed, restart votes listener with correct query filters
-	                if (prevIsAdmin !== isAdmin) {
-	                    restartVotesListener();
-	                }
+
+                // (re)start votes listener with correct permissions
+                restartVotesListenerIfNeeded();
 
                 renderSettings(settings);
                 renderQueue(currentQueue); // re-render s novým nastavením
@@ -986,9 +990,6 @@
                 console.error('Queue listener error:', err);
                 showModal('Chyba načítání (queue): ' + (err?.message || err));
             });
-
-	            // Votes listener (role-aware)
-	            restartVotesListener();
         }
         
         // --- OPRAVENÁ HLAVNÍ FUNKCE ---
