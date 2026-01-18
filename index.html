@@ -296,6 +296,8 @@
         let votes = [], selectedVoteId = null, voteStyle = 'bars';
         let voteResponses = [], myVote = null;
         let unsubscribeConfig, unsubscribeQueue, unsubscribeVotes, unsubscribeVoteResponses; // To hold listener unsub functions
+        let lastIsAdmin = null; // track role changes for restarting votes listener
+ // To hold listener unsub functions
 
         // --- UI Element Query Selector ---
         const $ = (selector) => document.querySelector(selector);
@@ -887,23 +889,69 @@
             document.body.classList.toggle('is-admin', isAdminStatus);
         }
 
+        
         function startListeners() {
-             // Zastavíme staré posluchače, pokud existují
+            // Zastavime stare posluchace, pokud existuji
             if (unsubscribeConfig) unsubscribeConfig();
             if (unsubscribeQueue) unsubscribeQueue();
             if (unsubscribeVotes) unsubscribeVotes();
             if (unsubscribeVoteResponses) unsubscribeVoteResponses();
-            
+
+            // Votes listener (role-aware query)
+            function startVotesListener() {
+                if (unsubscribeVotes) unsubscribeVotes();
+
+                // IMPORTANT: non-admin must be filtered to visible votes,
+                // otherwise Firestore rejects the whole query as potentially returning hidden docs.
+                const q = isAdmin
+                    ? query(votesRef, orderBy('createdAt','desc'))
+                    : query(votesRef, where('visible','==',true), orderBy('createdAt','desc'));
+
+                unsubscribeVotes = onSnapshot(q, async (vSnap) => {
+                    votes = vSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+                    updateVotingNavVisibility();
+
+                    const active = getActiveVote();
+
+                    // Keep selection valid (especially when switching role or visibility changes)
+                    if (!selectedVoteId && active) selectedVoteId = active.id;
+                    if (selectedVoteId && !votes.some(v => v.id === selectedVoteId)) {
+                        selectedVoteId = active?.id || votes[0]?.id || null;
+                    }
+
+                    await startVoteResponsesListener(selectedVoteId);
+                    renderVoting();
+                    renderVotesAdmin();
+                }, (err) => {
+                    console.error('Votes listener error:', err);
+                    showModal('Chyba nacitani hlasovani: ' + (err?.message || err));
+                });
+            }
+
             unsubscribeConfig = onSnapshot(configDocRef, (doc) => {
                 if (!doc.exists()) return;
                 dbState = doc.data() || {};
                 const { state = {}, settings = {} } = dbState;
 
-                isAdmin = settings.admins?.includes(currentUser?.email) ?? false;
-                setUiForAdmin(isAdmin);
+                const newIsAdmin = settings.admins?.includes(currentUser?.email) ?? false;
+                if (isAdmin !== newIsAdmin) {
+                    isAdmin = newIsAdmin;
+                    setUiForAdmin(isAdmin);
+
+                    // Restart votes listener when role changes (prevents permission errors)
+                    lastIsAdmin = isAdmin;
+                    startVotesListener();
+                } else {
+                    // ensure we start it at least once after role becomes known
+                    if (lastIsAdmin === null) {
+                        lastIsAdmin = isAdmin;
+                        startVotesListener();
+                    }
+                    setUiForAdmin(isAdmin);
+                }
 
                 renderSettings(settings);
-                renderQueue(currentQueue); // re-render s novým nastavením
+                renderQueue(currentQueue); // re-render s novym nastavenim
 
                 const signupsEnabled = settings.signupsEnabled ?? true;
                 ui.signupsEnabledToggle.checked = signupsEnabled;
@@ -912,7 +960,7 @@
 
                 const currentSpeaker = state.currentSpeaker;
                 ui.currentSpeakerName.textContent = currentSpeaker?.name || '- Nikdo -';
-                ui.currentSpeakerTitle.textContent = currentSpeaker?.type || 'Právě mluví';
+                ui.currentSpeakerTitle.textContent = currentSpeaker?.type || 'Prave mluvi';
 
                 const timerState = state.timer || {};
                 if (!isDraggingTimer) {
@@ -943,7 +991,7 @@
                 ui.pauseTimerBtn.disabled = !timerState.isRunning;
             }, (err) => {
                 console.error('Config listener error:', err);
-                showModal('Chyba načítání (config): ' + (err?.message || err));
+                showModal('Chyba nacitani (config): ' + (err?.message || err));
             });
 
             unsubscribeQueue = onSnapshot(query(queueRef), (qSnap) => {
@@ -951,26 +999,10 @@
                 renderQueue(currentQueue);
             }, (err) => {
                 console.error('Queue listener error:', err);
-                showModal('Chyba načítání (queue): ' + (err?.message || err));
-            });
-
-            // Votes listener
-            unsubscribeVotes = onSnapshot(query(votesRef, orderBy('createdAt','desc')), async (vSnap) => {
-                votes = vSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-                updateVotingNavVisibility();
-                const active = getActiveVote();
-                // pokud je aktivní hlasování, přepneme se na něj (pokud uživatel nemá vybranou jinou volbu)
-                if (!selectedVoteId && active) selectedVoteId = active.id;
-                if (selectedVoteId && !votes.some(v => v.id === selectedVoteId)) selectedVoteId = active?.id || votes[0]?.id || null;
-                await startVoteResponsesListener(selectedVoteId);
-                renderVoting();
-                renderVotesAdmin();
-            }, (err) => {
-                console.error('Votes listener error:', err);
-                showModal('Chyba načítání hlasování: ' + (err?.message || err));
+                showModal('Chyba nacitani (queue): ' + (err?.message || err));
             });
         }
-        
+
         // --- OPRAVENÁ HLAVNÍ FUNKCE ---
         onAuthStateChanged(auth, async (user) => {
             if (user) {
