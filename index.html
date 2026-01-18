@@ -61,7 +61,7 @@
                     <nav id="main-nav" class="flex flex-wrap gap-2">
                         <button data-view="presenter" class="nav-btn px-3 py-2 rounded-md text-gray-700 hover:bg-blue-100">Prezentace</button>
                         <button data-view="speaker" class="nav-btn px-3 py-2 rounded-md text-gray-700 hover:bg-blue-100">Přihlášení</button>
-                        <button data-view=\"voting\" id=\"voting-nav-btn\" class=\"nav-btn px-3 py-2 rounded-md text-gray-700 hover:bg-blue-100 hidden\">Hlasování</button>
+                        <button data-view="voting" id="voting-nav-btn" class="nav-btn px-3 py-2 rounded-md text-gray-700 hover:bg-blue-100 hidden">Hlasování</button>
 <button data-view="admin" id="admin-nav-btn" class="nav-btn px-3 py-2 rounded-md text-gray-700 hover:bg-blue-100 hidden">Administrace</button>
                         <button id="logout-btn" class="ml-2 px-3 py-2 rounded-md text-red-600 hover:bg-red-100" title="Odhlásit se"><i class="fa-solid fa-right-from-bracket"></i></button>
                     </nav>
@@ -430,6 +430,7 @@
         function updateVotingNavVisibility(){
             const hasAnyVisible = getVisibleVotes().length > 0;
             // admin uvidí vždy (kvůli správě a náhledu)
+            if (!ui.votingNavBtn) return;
             ui.votingNavBtn.classList.toggle('hidden', !(isAdmin || hasAnyVisible));
         }
 
