@@ -131,6 +131,7 @@
                                 <button id="vote-style-donut" class="vote-style-btn px-3 py-2 rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200" data-style="donut"><i class="fa-solid fa-chart-pie mr-2"></i>Kruh</button>
                                 <button id="vote-style-grid" class="vote-style-btn px-3 py-2 rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200" data-style="grid"><i class="fa-solid fa-border-all mr-2"></i>Mřížka</button>
                             </div>
+                            <button id="vote-fullscreen-btn" class="hidden px-3 py-2 rounded-md bg-black text-white hover:bg-gray-900"><i class="fa-solid fa-expand mr-2"></i>Celá obrazovka</button>
                         </div>
 
                         <div class="grid md:grid-cols-3 gap-4">
@@ -261,6 +262,37 @@
                 </div>
             </div>
         </div>
+                <div id="vote-fullscreen-overlay" class="hidden fixed inset-0 bg-white z-50">
+            <div class="h-full w-full p-8 flex flex-col">
+                <div class="flex items-start justify-between gap-6">
+                    <div class="min-w-0">
+                        <div id="vote-fullscreen-topic" class="text-3xl font-bold text-gray-900 truncate">-</div>
+                        <div class="mt-2 text-gray-600 flex flex-wrap gap-x-6 gap-y-1">
+                            <div>Odevzdáno: <span id="vote-fullscreen-cast" class="font-semibold">0</span></div>
+                            <div>Nastaveno: <span id="vote-fullscreen-total" class="font-semibold">0</span></div>
+                        </div>
+                    </div>
+                    <button id="vote-fullscreen-exit-btn" class="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300"><i class="fa-solid fa-xmark mr-2"></i>Zavřít</button>
+                </div>
+
+                <div class="mt-6 grid md:grid-cols-3 gap-4">
+                    <div class="p-4 bg-green-50 border border-green-100 rounded-lg">
+                        <div class="flex items-center justify-between"><span class="font-semibold text-green-900">ANO</span><span class="text-sm text-green-700"><span id="vote-fullscreen-yes-pct">0</span>%</span></div>
+                        <div class="mt-2 text-3xl font-bold text-green-800"><span id="vote-fullscreen-yes">0</span></div>
+                    </div>
+                    <div class="p-4 bg-red-50 border border-red-100 rounded-lg">
+                        <div class="flex items-center justify-between"><span class="font-semibold text-red-900">NE</span><span class="text-sm text-red-700"><span id="vote-fullscreen-no-pct">0</span>%</span></div>
+                        <div class="mt-2 text-3xl font-bold text-red-800"><span id="vote-fullscreen-no">0</span></div>
+                    </div>
+                    <div class="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                        <div class="flex items-center justify-between"><span class="font-semibold text-gray-900">ZDRŽEL SE</span><span class="text-sm text-gray-600"><span id="vote-fullscreen-abstain-pct">0</span>%</span></div>
+                        <div class="mt-2 text-3xl font-bold text-gray-700"><span id="vote-fullscreen-abstain">0</span></div>
+                    </div>
+                </div>
+
+                <div id="vote-fullscreen-viz" class="mt-6 flex-grow min-h-0 border rounded-lg p-6 flex items-center justify-center overflow-hidden"></div>
+            </div>
+        </div>
         <div id="message-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"><div class="bg-white rounded-lg shadow-xl p-8 max-w-lg text-center"><p id="modal-text" class="mb-6 text-base text-left"></p><div class="flex justify-end gap-4"><button id="modal-close-btn" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded-lg">OK</button></div></div></div>
     </div>
 
@@ -296,7 +328,6 @@
         let votes = [], selectedVoteId = null, voteStyle = 'bars';
         let voteResponses = [], myVote = null;
         let unsubscribeConfig, unsubscribeQueue, unsubscribeVotes, unsubscribeVoteResponses; // To hold listener unsub functions
-        let votesListenerMode = null; // 'admin' | 'user'
 
         // --- UI Element Query Selector ---
         const $ = (selector) => document.querySelector(selector);
@@ -334,6 +365,15 @@
             votePublicList: $('#vote-public-list'),
             votePublicYes: $('#vote-public-yes'), votePublicNo: $('#vote-public-no'), votePublicAbstain: $('#vote-public-abstain'),
             pastVotes: $('#past-votes'),
+            voteFullscreenBtn: $('#vote-fullscreen-btn'),
+            voteFullscreenOverlay: $('#vote-fullscreen-overlay'),
+            voteFullscreenExitBtn: $('#vote-fullscreen-exit-btn'),
+            voteFsTopic: $('#vote-fullscreen-topic'),
+            voteFsCast: $('#vote-fullscreen-cast'),
+            voteFsTotal: $('#vote-fullscreen-total'),
+            voteFsYes: $('#vote-fullscreen-yes'), voteFsNo: $('#vote-fullscreen-no'), voteFsAbstain: $('#vote-fullscreen-abstain'),
+            voteFsYesPct: $('#vote-fullscreen-yes-pct'), voteFsNoPct: $('#vote-fullscreen-no-pct'), voteFsAbstainPct: $('#vote-fullscreen-abstain-pct'),
+            voteFsViz: $('#vote-fullscreen-viz'),
             newVoteTopic: $('#new-vote-topic'), newVoteTotal: $('#new-vote-total'), addVoteBtn: $('#add-vote-btn'),
             votesAdminList: $('#votes-admin-list'),
         };
@@ -542,6 +582,50 @@
             else ui.voteViz.innerHTML = renderBarsViz(t);
         }
 
+        function renderVoteFullscreen(){
+            if (!ui.voteFullscreenOverlay || ui.voteFullscreenOverlay.classList.contains('hidden')) return;
+            const vote = votes.find(v => v.id === selectedVoteId) || getActiveVote();
+            if (!vote) return;
+            const t = computeTallies(vote.totalMembers, voteResponses);
+            ui.voteFsTopic.textContent = vote.topic || '-';
+            ui.voteFsCast.textContent = String(t.cast);
+            ui.voteFsTotal.textContent = String(t.total);
+            ui.voteFsYes.textContent = String(t.yes);
+            ui.voteFsNo.textContent = String(t.no);
+            ui.voteFsAbstain.textContent = String(t.abstain);
+            ui.voteFsYesPct.textContent = formatPct(t.yesPct);
+            ui.voteFsNoPct.textContent = formatPct(t.noPct);
+            ui.voteFsAbstainPct.textContent = formatPct(t.abstainPct);
+
+            // jednoduchá, velmi čitelná vizualizace (sloupce)
+            if (ui.voteFsViz) {
+                ui.voteFsViz.innerHTML = renderBarsViz(t);
+            }
+        }
+
+        async function openVoteFullscreen(){
+            if (!isAdmin) return;
+            const vote = votes.find(v => v.id === selectedVoteId) || getActiveVote();
+            if (!vote) return showModal('Není vybrané žádné hlasování.');
+            ui.voteFullscreenOverlay.classList.remove('hidden');
+            renderVoteFullscreen();
+            try {
+                if (ui.voteFullscreenOverlay.requestFullscreen && !document.fullscreenElement) {
+                    await ui.voteFullscreenOverlay.requestFullscreen();
+                }
+            } catch (e) {
+                // Fullscreen může být blokovaný – nevadí, overlay stejně funguje.
+            }
+        }
+
+        function closeVoteFullscreen(){
+            ui.voteFullscreenOverlay?.classList.add('hidden');
+            try {
+                if (document.fullscreenElement) document.exitFullscreen();
+            } catch (e) {}
+        }
+
+
         function renderPublicVotingList(vote){
             if (!vote) return;
             const isSecret = vote.secret === true;
@@ -564,26 +648,25 @@
         }
 
         function renderPastVotesButtons(){
-            const list = (isAdmin ? (votes || []) : getVisibleVotes())
-                .slice()
-                .sort((a,b)=> (b.createdAt?.toMillis?.()||0)-(a.createdAt?.toMillis?.()||0));
+            const visible = getVisibleVotes().slice().sort((a,b)=> (b.createdAt?.toMillis?.()||0)-(a.createdAt?.toMillis?.()||0));
             const active = getActiveVote();
             ui.pastVotes.innerHTML = '';
-            if (list.length === 0) {
+            if (visible.length === 0) {
                 ui.pastVotes.innerHTML = '<span class="text-sm text-gray-500">Žádná hlasování.</span>';
                 return;
             }
-            list.forEach(v => {
+            visible.forEach(v => {
                 const btn = document.createElement('button');
                 const isActive = !!active && v.id === active.id;
-                const isSelected = !!selectedVoteId && v.id === selectedVoteId;
-
-                const base = 'px-3 py-2 rounded-md text-sm transition';
-                const selectedCls = isSelected ? ' bg-blue-600 text-white hover:bg-blue-700' : ' bg-gray-200 hover:bg-gray-300 text-gray-800';
-                const activeCls = isActive ? ' ring-2 ring-green-500' : '';
-
-                btn.className = base + selectedCls + activeCls;
-                btn.textContent = (v.topic || '(bez tématu)') + (isActive ? ' • AKTIVNÍ' : '');
+                const isSelected = v.id === selectedVoteId;
+                btn.className = 'px-3 py-2 rounded-md text-sm border ' +
+                    (isSelected ? 'bg-blue-600 text-white border-blue-700' : 'bg-gray-200 hover:bg-gray-300 text-gray-800 border-gray-300');
+                if (isActive) {
+                    btn.classList.add('ring-2','ring-green-400');
+                    btn.textContent = (v.topic || '(bez tématu)') + ' • AKTIVNÍ';
+                } else {
+                    btn.textContent = v.topic || '(bez tématu)';
+                }
                 btn.dataset.voteId = v.id;
                 ui.pastVotes.appendChild(btn);
             });
@@ -896,31 +979,6 @@
             document.body.classList.toggle('is-admin', isAdminStatus);
         }
 
-        function restartVotesListenerIfNeeded(){
-            const mode = isAdmin ? 'admin' : 'user';
-            if (votesListenerMode === mode && unsubscribeVotes) return;
-            votesListenerMode = mode;
-            if (unsubscribeVotes) unsubscribeVotes();
-
-            const baseQuery = isAdmin
-                ? query(votesRef, orderBy('createdAt','desc'))
-                : query(votesRef, where('visible','==', true), orderBy('createdAt','desc'));
-
-            unsubscribeVotes = onSnapshot(baseQuery, async (vSnap) => {
-                votes = vSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-                updateVotingNavVisibility();
-                const active = getActiveVote();
-                if (!selectedVoteId && active) selectedVoteId = active.id;
-                if (selectedVoteId && !votes.some(v => v.id === selectedVoteId)) selectedVoteId = active?.id || votes[0]?.id || null;
-                await startVoteResponsesListener(selectedVoteId);
-                renderVoting();
-                renderVotesAdmin();
-            }, (err) => {
-                console.error('Votes listener error:', err);
-                showModal('Chyba načítání hlasování: ' + (err?.message || err));
-            });
-        }
-
         function startListeners() {
              // Zastavíme staré posluchače, pokud existují
             if (unsubscribeConfig) unsubscribeConfig();
@@ -935,9 +993,6 @@
 
                 isAdmin = settings.admins?.includes(currentUser?.email) ?? false;
                 setUiForAdmin(isAdmin);
-
-                // (re)start votes listener with correct permissions
-                restartVotesListenerIfNeeded();
 
                 renderSettings(settings);
                 renderQueue(currentQueue); // re-render s novým nastavením
@@ -990,6 +1045,22 @@
                 console.error('Queue listener error:', err);
                 showModal('Chyba načítání (queue): ' + (err?.message || err));
             });
+
+            // Votes listener
+            unsubscribeVotes = onSnapshot(query(votesRef, orderBy('createdAt','desc')), async (vSnap) => {
+                votes = vSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+                updateVotingNavVisibility();
+                const active = getActiveVote();
+                // pokud je aktivní hlasování, přepneme se na něj (pokud uživatel nemá vybranou jinou volbu)
+                if (!selectedVoteId && active) selectedVoteId = active.id;
+                if (selectedVoteId && !votes.some(v => v.id === selectedVoteId)) selectedVoteId = active?.id || votes[0]?.id || null;
+                await startVoteResponsesListener(selectedVoteId);
+                renderVoting();
+                renderVotesAdmin();
+            }, (err) => {
+                console.error('Votes listener error:', err);
+                showModal('Chyba načítání hlasování: ' + (err?.message || err));
+            });
         }
         
         // --- OPRAVENÁ HLAVNÍ FUNKCE ---
@@ -1041,6 +1112,15 @@
         ui.voteAbstainBtn.addEventListener('click', () => castVote('abstain').catch(err => showModal(err?.message || err)));
 
         ui.voteStyleBtns.forEach(btn => btn.addEventListener('click', () => setVoteStyle(btn.dataset.style)));
+
+        ui.voteFullscreenBtn?.addEventListener('click', () => openVoteFullscreen());
+        ui.voteFullscreenExitBtn?.addEventListener('click', () => closeVoteFullscreen());
+        document.addEventListener('fullscreenchange', () => {
+            if (!document.fullscreenElement && ui.voteFullscreenOverlay && !ui.voteFullscreenOverlay.classList.contains('hidden')) {
+                // uživatel ukončil fullscreen přes ESC
+                ui.voteFullscreenOverlay.classList.add('hidden');
+            }
+        });
 
         ui.pastVotes.addEventListener('click', (e) => {
             const btn = e.target.closest('button[data-vote-id]');
@@ -1119,9 +1199,35 @@
                 }
                 return;
             }
-            if (e.target.closest('.vote-details-toggle')) {
+            if (e.target.closest('.open-vote-details-btn') || e.target.closest('.close-vote-details-btn')) {
                 const details = card.querySelector('.vote-details');
-                if (details) details.classList.toggle('hidden');
+                if (!details) return;
+                const wantOpen = !!e.target.closest('.open-vote-details-btn');
+                details.classList.toggle('hidden', !wantOpen);
+                if (wantOpen) {
+                    // načíst a vykreslit jmenný seznam hlasů pro dané hlasování
+                    const list = card.querySelector('.vote-details-list');
+                    if (list) list.innerHTML = '<div class="text-sm text-gray-500">Načítám...</div>';
+                    try {
+                        const snap = await getDocs(query(voteResponsesRef(voteId), orderBy('updatedAt','desc')));
+                        const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                        if (!list) return;
+                        if (rows.length == 0) {
+                            list.innerHTML = '<div class="text-sm text-gray-400">Zatím nikdo nehlasoval.</div>';
+                        } else {
+                            const map = { yes: 'ANO', no: 'NE', abstain: 'Zdržel se' };
+                            list.innerHTML = rows.map(r => {
+                                const party = (r.party || '').trim();
+                                const partyTxt = party ? ` <span class="text-xs text-gray-500">(${party})</span>` : '';
+                                const choiceTxt = map[r.choice] || '-';
+                                return `<div class="flex items-center justify-between gap-3 p-2 bg-white border rounded">                                    <div class="min-w-0">                                        <div class="font-semibold truncate">${(r.name || 'Neznámý')} ${partyTxt}</div>                                        <div class="text-xs text-gray-500">${choiceTxt}</div>                                    </div>                                    <button class="delete-response-btn text-red-600 hover:text-red-800 px-2" data-uid="${r.id}" title="Smazat hlas"><i class="fa-solid fa-trash"></i></button>                                </div>`;
+                            }).join('');
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        if (list) list.innerHTML = '<div class="text-sm text-red-600">Nepodařilo se načíst detaily.</div>';
+                    }
+                }
                 return;
             }
             if (e.target.closest('.delete-response-btn')) {
