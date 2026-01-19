@@ -35,7 +35,7 @@
         body.fullscreen #exit-fullscreen-btn { display: block; }
         body.fullscreen #fullscreen-btn { display: none; }
         .collapsible-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-in-out; }
-        .collapsible-content:not(.hidden) { max-height: 1000px; /* Adjust as needed */ }
+        .collapsible-content:not(.hidden) { max-height: none; /* Removed fixed height to prevent cutoff */ }
 
         /* Mobile/scroll fixes */
         #main-content { overflow-y: auto; -webkit-overflow-scrolling: touch; }
@@ -674,6 +674,10 @@ function renderDonutViz(t, opts = {}){
         function renderVoteVisualizationInto(targetEl, opts = {}){
             const vote = votes.find(v => v.id === selectedVoteId) || getActiveVote();
             if (!vote) { if (targetEl) targetEl.innerHTML = ''; return; }
+            if (vote.resultsVisible === false) {
+                if (targetEl) targetEl.innerHTML = '<div class="h-full flex items-center justify-center text-gray-400 text-sm italic p-4 text-center">Výsledky budou zobrazeny po ukončení hlasování.</div>';
+                return;
+            }
 
             // Auto-size for bars/grid based on available space (especially fullscreen + mobile)
             const w = (targetEl?.clientWidth || 0);
@@ -712,7 +716,7 @@ function renderDonutViz(t, opts = {}){
         }
 
         function renderPublicVotingList(vote){
-            if (!vote) return;
+            if (!vote || (vote.resultsVisible === false)) { ui.votePublicList.classList.add('hidden'); return; }
             const isSecret = vote.secret === true;
             const showNames = !isSecret;
             ui.votePublicList.classList.toggle('hidden', !showNames);
@@ -782,7 +786,10 @@ function renderDonutViz(t, opts = {}){
             ui.votingTopic.textContent = vote.topic || '-';
             ui.votingTotal.textContent = String(vote.totalMembers ?? 0);
 
-            const t = computeTallies(vote.totalMembers, voteResponses);
+            let t = computeTallies(vote.totalMembers, voteResponses);
+            if (vote.resultsVisible === false) {
+                t = { yes: 0, no: 0, abstain: 0, cast: t.cast, total: t.total, yesPct: 0, noPct: 0, abstainPct: 0 };
+            }
             ui.votingCast.textContent = String(t.cast);
             ui.votingYes.textContent = String(t.yes);
             ui.votingNo.textContent = String(t.no);
@@ -956,6 +963,7 @@ function renderDonutViz(t, opts = {}){
                 const active = v.active === true;
                 const visible = v.visible === true;
                 const secret = v.secret === true;
+                const resultsVisible = v.resultsVisible === true;
 
                 card.innerHTML = `
                     <div class="flex items-start justify-between gap-3">
@@ -965,6 +973,7 @@ function renderDonutViz(t, opts = {}){
                                 ${active ? '<span class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">AKTIVNÍ</span>' : ''}
                                 ${visible ? '<span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">VIDITELNÉ</span>' : '<span class="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">SKRYTÉ</span>'}
                                 ${secret ? '<span class="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">TAJNÉ</span>' : '<span class="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">VEŘEJNÉ</span>'}
+                                ${resultsVisible ? '<span class="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">VÝSLEDKY</span>' : '<span class="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">BEZ VÝSLEDKŮ</span>'}
                             </div>
                             <div class="text-sm text-gray-600 mt-1">
                                 Nastaveno poslanců: <span class="font-semibold">${v.totalMembers ?? 0}</span>
@@ -976,7 +985,7 @@ function renderDonutViz(t, opts = {}){
                         </div>
                     </div>
 
-                    <div class="grid md:grid-cols-3 gap-3">
+                    <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-3">
                         <div class="p-2 border rounded-lg">
                             <div class="flex items-center justify-between">
                                 <span class="font-semibold text-gray-700">Aktivní</span>
@@ -985,7 +994,7 @@ function renderDonutViz(t, opts = {}){
                                     <label for="act-${v.id}" class="toggle-label"><div class="dot"></div></label>
                                 </div>
                             </div>
-                            <p class="text-xs text-gray-500 mt-1">Pouze jedno hlasování může být aktivní.</p>
+                            <p class="text-xs text-gray-500 mt-1 leading-tight">Aktivní hlasování.</p>
                         </div>
                         <div class="p-2 border rounded-lg">
                             <div class="flex items-center justify-between">
@@ -995,7 +1004,7 @@ function renderDonutViz(t, opts = {}){
                                     <label for="vis-${v.id}" class="toggle-label"><div class="dot"></div></label>
                                 </div>
                             </div>
-                            <p class="text-xs text-gray-500 mt-1">Skryté hlasování neuvidí poslanci.</p>
+                            <p class="text-xs text-gray-500 mt-1 leading-tight">Viditelné pro poslance.</p>
                         </div>
                         <div class="p-2 border rounded-lg">
                             <div class="flex items-center justify-between">
@@ -1005,7 +1014,17 @@ function renderDonutViz(t, opts = {}){
                                     <label for="sec-${v.id}" class="toggle-label"><div class="dot"></div></label>
                                 </div>
                             </div>
-                            <p class="text-xs text-gray-500 mt-1">Tajné = bez jmen u poslanců.</p>
+                            <p class="text-xs text-gray-500 mt-1 leading-tight">Bez jmen u poslanců.</p>
+                        </div>
+                        <div class="p-2 border rounded-lg">
+                            <div class="flex items-center justify-between">
+                                <span class="font-semibold text-gray-700">Výsledky</span>
+                                <div class="relative">
+                                    <input type="checkbox" class="toggle-checkbox vote-results-toggle" id="res-${v.id}" ${resultsVisible ? 'checked' : ''}>
+                                    <label for="res-${v.id}" class="toggle-label"><div class="dot"></div></label>
+                                </div>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1 leading-tight">Zobrazit výsledky.</p>
                         </div>
                     </div>
 
@@ -1354,7 +1373,7 @@ function renderDonutViz(t, opts = {}){
             const total = parseInt(ui.newVoteTotal.value, 10);
             if (!topic) return showModal('Zadejte téma hlasování.');
             if (!Number.isFinite(total) || total <= 0) return showModal('Zadejte platný počet poslanců (> 0).');
-            await addDoc(votesRef, { topic, totalMembers: total, active: false, visible: false, secret: false, createdAt: serverTimestamp() });
+            await addDoc(votesRef, { topic, totalMembers: total, active: false, visible: false, secret: false, resultsVisible: false, createdAt: serverTimestamp() });
             ui.newVoteTopic.value = '';
             ui.newVoteTotal.value = '';
         });
@@ -1391,6 +1410,10 @@ function renderDonutViz(t, opts = {}){
                 }
                 if (e.target.classList.contains('vote-secret-toggle')) {
                     await updateDoc(ref, { secret: e.target.checked });
+                }
+                if (e.target.classList.contains('vote-results-toggle')) {
+                    await updateDoc(ref, { resultsVisible: e.target.checked });
+                    refreshVoteCounts();
                 }
                 if (e.target.classList.contains('vote-total-input')) {
                     const val = parseInt(e.target.value, 10);
