@@ -457,7 +457,9 @@
             ui.navBtns.forEach(b=>b.classList.toggle('bg-blue-200',b.dataset.view===viewName));
             if (viewName === 'speaker') {
                 handleTileSelection(ui.contributionTiles, ui.contributionTiles.children[0]?.dataset.name || null, false);
-                handleTileSelection(ui.partyTiles, ui.partyTiles.children[0]?.dataset.name || null, true);
+                const savedParty = localStorage.getItem('parliamentPartyName');
+                const partyToSelect = (savedParty !== null && [...ui.partyTiles.children].some(t => t.dataset.name === savedParty)) ? savedParty : (ui.partyTiles.children[0]?.dataset.name || null);
+                handleTileSelection(ui.partyTiles, partyToSelect, true);
                 updateSignupButtonState();
             }
             if (viewName === 'voting') {
@@ -507,7 +509,9 @@
             if(parties.length===0){ui.partiesList.innerHTML='<p class="text-center text-gray-500">Žádné politické strany.</p>';}else{parties.forEach(p=>{const d=document.createElement('div');d.className='flex justify-between items-center p-2 bg-gray-100 rounded-md';d.innerHTML=`<span>${p.name}</span><button data-name="${p.name}" class="remove-party-btn text-red-500 hover:text-red-700 font-bold text-xl">&times;</button>`;ui.partiesList.appendChild(d);const t=document.createElement('button');t.className='tile p-2 rounded-lg bg-gray-200 hover:bg-gray-300';t.dataset.name=p.name;t.textContent=p.name;ui.partyTiles.appendChild(t)})}
             
             handleTileSelection(ui.contributionTiles, ui.contributionTiles.children[0]?.dataset.name || null, false);
-            handleTileSelection(ui.partyTiles, ui.partyTiles.children[0]?.dataset.name || null, true);
+            const savedParty = localStorage.getItem('parliamentPartyName');
+            const partyToSelect = (savedParty !== null && [...ui.partyTiles.children].some(t => t.dataset.name === savedParty)) ? savedParty : (ui.partyTiles.children[0]?.dataset.name || null);
+            handleTileSelection(ui.partyTiles, partyToSelect, true);
         }
         
 
@@ -1267,10 +1271,13 @@ function renderDonutViz(t, opts = {}){
         ui.navBtns.forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.view)));
         ui.signupBtn.addEventListener('click',async()=>{try{const name=ui.speakerNameInput.value.trim();if(!name) throw new Error("Jméno nesmí být prázdné.");localStorage.setItem('parliamentSpeakerName',name);const isDuplicate=currentQueue.some(s=>s.name.toLowerCase()===name.toLowerCase()&&s.type===selectedContribution);if(isDuplicate){throw new Error(`Řečník <b>${name}</b> je již přihlášen s tímto typem příspěvku.`);}await runTransaction(db,async t=>{const c=await t.get(configDocRef);const typeSetting=dbState.settings?.types.find(s=>s.name===selectedContribution);if(typeSetting?.maxSignups!=null){const qSnap=await getDocs(query(queueRef,where("type","==",selectedContribution)));if(qSnap.size>=typeSetting.maxSignups)throw new Error(`Byl dosažen maximální počet přihlášek pro tento typ.`);}const qDocs = await getDocs(query(queueRef)); if(qDocs.empty&&!c.data().state.currentSpeaker){const n=typeSetting?.time??0;t.update(configDocRef,{"state.currentSpeaker":{name,type:selectedContribution,party:selectedParty},"state.timer":{timeRemaining:n,totalTime:n,isRunning:false}})}else{await addDoc(queueRef, {name,type:selectedContribution,party:selectedParty,timestamp:new Date()})}});showModal("Úspěšně přihlášen/a.");ui.speakerNameInput.value=localStorage.getItem('parliamentSpeakerName')||currentUser.displayName||'';switchView('presenter');}catch(e){showModal(e.message||"Přihlášení selhalo.")}});
         
-        const handleTileSelection=(container,value,isParty)=>{if(isParty){selectedParty=value;localStorage.setItem('parliamentPartyName',value||'');}else{selectedContribution=value;}[...container.children].forEach(t=>t.classList.toggle('selected',t.dataset.name===value));updateSignupButtonState();};
+        const handleTileSelection=(container,value,isParty)=>{if(isParty){selectedParty=value; if(value !== null) localStorage.setItem('parliamentPartyName',value);}else{selectedContribution=value;}[...container.children].forEach(t=>t.classList.toggle('selected',t.dataset.name===value));updateSignupButtonState();};
         ui.partyTiles.addEventListener('click',e=>{if(e.target.matches('.tile'))handleTileSelection(ui.partyTiles,e.target.dataset.name,true)});
         ui.contributionTiles.addEventListener('click',e=>{if(e.target.matches('.tile'))handleTileSelection(ui.contributionTiles,e.target.dataset.name,false)});
-        ui.speakerNameInput.addEventListener('input', updateSignupButtonState);
+        ui.speakerNameInput.addEventListener('input', () => {
+            localStorage.setItem('parliamentSpeakerName', ui.speakerNameInput.value.trim());
+            updateSignupButtonState();
+        });
 
         // Voting UI
         ui.voteYesBtn.addEventListener('click', () => castVote('yes').catch(err => showModal(err?.message || err)));
