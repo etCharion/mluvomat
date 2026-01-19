@@ -279,6 +279,7 @@
             </div>
         </div>
         <div id="message-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"><div class="bg-white rounded-lg shadow-xl p-8 max-w-lg text-center"><p id="modal-text" class="mb-6 text-base text-left"></p><div class="flex justify-end gap-4"><button id="modal-close-btn" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded-lg">OK</button></div></div></div>
+        <div id="confirm-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"><div class="bg-white rounded-lg shadow-xl p-8 max-w-lg text-center"><p id="confirm-modal-text" class="mb-6 text-base text-left"></p><div class="flex justify-end gap-4"><button id="confirm-modal-cancel-btn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-6 rounded-lg">Zrušit</button><button id="confirm-modal-ok-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg">Potvrdit</button></div></div></div>
     </div>
 
 	    <!-- Vote Fullscreen Overlay (admin) -->
@@ -352,7 +353,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, addDoc, deleteDoc, runTransaction, updateDoc, query, getDocs, where, writeBatch, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, addDoc, deleteDoc, runTransaction, updateDoc, query, getDocs, where, writeBatch, orderBy, serverTimestamp, getCountFromServer } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Basic Setup ---
         const firebaseConfig = {
@@ -442,6 +443,20 @@
         // --- Core Functions ---
         const showModal=(message)=>{ui.modalText.innerHTML=message;ui.messageModal.classList.remove('hidden');};
         ui.modalCloseBtn.addEventListener('click',()=>ui.messageModal.classList.add('hidden'));
+
+        const showConfirm = (message, onConfirm) => {
+            const modal = $('#confirm-modal');
+            $('#confirm-modal-text').innerHTML = message;
+            modal.classList.remove('hidden');
+            const okBtn = $('#confirm-modal-ok-btn');
+            const cancelBtn = $('#confirm-modal-cancel-btn');
+            const newOk = okBtn.cloneNode(true);
+            const newCancel = cancelBtn.cloneNode(true);
+            okBtn.replaceWith(newOk);
+            cancelBtn.replaceWith(newCancel);
+            newOk.addEventListener('click', () => { onConfirm(); modal.classList.add('hidden'); });
+            newCancel.addEventListener('click', () => { modal.classList.add('hidden'); });
+        };
         
         const switchView=(viewName)=>{
             Object.values(ui.views).forEach(v=>v.classList.remove('active-view','flex','items-center','justify-center'));
@@ -911,6 +926,9 @@ function renderDonutViz(t, opts = {}){
             if (!voteId) return;
             unsubscribeVoteResponses = onSnapshot(query(voteResponsesRef(voteId), orderBy('updatedAt','desc')), (snap) => {
                 voteResponses = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                if (isAdmin) {
+                    voteCounts[voteId] = snap.size;
+                }
                 renderVoting();
                 if (isAdmin) renderVotesAdmin();
             }, (err) => {
@@ -918,6 +936,9 @@ function renderDonutViz(t, opts = {}){
                 showModal('Chyba načítání hlasů: ' + (err?.message || err));
             });
         }
+
+        let voteCounts = {}; // { voteId: count }
+        let openDetailVoteId = null;
 
         function renderVotesAdmin(){
             if (!isAdmin) return;
@@ -949,7 +970,10 @@ function renderDonutViz(t, opts = {}){
                                 Nastaveno poslanců: <span class="font-semibold">${v.totalMembers ?? 0}</span>
                             </div>
                         </div>
-                        <button class="delete-vote-btn text-red-600 hover:text-red-800 px-2" title="Smazat"><i class="fa-solid fa-trash"></i></button>
+                        <div class="flex items-center gap-1">
+                            <button class="reset-vote-btn text-yellow-600 hover:text-yellow-800 px-2" title="Resetovat hlasy"><i class="fa-solid fa-rotate-left"></i></button>
+                            <button class="delete-vote-btn text-red-600 hover:text-red-800 px-2" title="Smazat"><i class="fa-solid fa-trash"></i></button>
+                        </div>
                     </div>
 
                     <div class="grid md:grid-cols-3 gap-3">
@@ -987,13 +1011,19 @@ function renderDonutViz(t, opts = {}){
 
                     <div class="p-2 border rounded-lg">
                         <label class="text-sm font-semibold text-gray-700">Počet přihlášených poslanců (100%)</label>
-                        <div class="flex gap-2 mt-2">
-                            <input type="number" class="vote-total-input flex-grow shadow appearance-none border rounded w-full py-2 px-3 text-gray-700" value="${v.totalMembers ?? 0}">
+                        <div class="flex gap-2 mt-2 items-center">
+                            <input type="number" class="vote-total-input flex-grow shadow appearance-none border rounded py-2 px-3 text-gray-700" value="${v.totalMembers ?? 0}">
+                            <div class="flex flex-col items-center px-2 min-w-[80px]">
+                                <span class="text-[10px] text-gray-500 uppercase font-bold">Hlasovalo</span>
+                                <span class="text-lg font-bold ${(voteCounts[v.id] || 0) !== (v.totalMembers || 0) ? 'text-red-600' : 'text-green-600'}">
+                                    ${voteCounts[v.id] || 0}
+                                </span>
+                            </div>
                             <button class="open-vote-details-btn bg-gray-200 hover:bg-gray-300 px-3 py-2 rounded-lg text-sm"><i class="fa-solid fa-list mr-2"></i>Detaily</button>
                         </div>
                     </div>
 
-                    <div class="vote-details hidden p-3 bg-gray-50 border rounded-lg">
+                    <div class="vote-details ${openDetailVoteId === v.id ? '' : 'hidden'} p-3 bg-gray-50 border rounded-lg">
                         <div class="flex items-center justify-between">
                             <span class="font-bold">Kdo hlasoval</span>
                             <button class="close-vote-details-btn text-gray-600 hover:text-gray-800"><i class="fa-solid fa-xmark"></i></button>
@@ -1003,6 +1033,11 @@ function renderDonutViz(t, opts = {}){
                 `;
                 ui.votesAdminList.appendChild(card);
             });
+
+            if (openDetailVoteId) {
+                const openCard = ui.votesAdminList.querySelector(`[data-vote-id="${openDetailVoteId}"]`);
+                if (openCard) renderVoteDetails(openCard);
+            }
         }
 
         async function deleteVote(voteId){
@@ -1128,6 +1163,16 @@ function renderDonutViz(t, opts = {}){
             document.body.classList.toggle('is-admin', isAdminStatus);
         }
 
+        async function refreshVoteCounts() {
+            if (!isAdmin) return;
+            const promises = votes.map(async (v) => {
+                const snap = await getCountFromServer(voteResponsesRef(v.id));
+                voteCounts[v.id] = snap.data().count;
+            });
+            await Promise.all(promises);
+            renderVotesAdmin();
+        }
+
         function startListeners() {
              // Zastavíme staré posluchače, pokud existují
             if (unsubscribeConfig) unsubscribeConfig();
@@ -1151,6 +1196,7 @@ function renderDonutViz(t, opts = {}){
 
                 unsubscribeVotes = onSnapshot(q, async (vSnap) => {
                     votes = vSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+                    refreshVoteCounts();
                     updateVotingNavVisibility();
                     const active = getActiveVote();
                     // pokud je aktivní hlasování, přepneme se na něj (pokud uživatel nemá vybranou jinou volbu)
@@ -1326,8 +1372,9 @@ function renderDonutViz(t, opts = {}){
                     const makeActive = e.target.checked;
                     if (makeActive) {
                         const batch = writeBatch(db);
+                        // Vypnout ostatní aktivní a zapnout toto (+ vynutit viditelnost)
                         votes.filter(v => v.active === true && v.id !== voteId).forEach(v => batch.update(voteDocRef(v.id), { active: false }));
-                        batch.update(ref, { active: true });
+                        batch.update(ref, { active: true, visible: true });
                         await batch.commit();
                         selectedVoteId = voteId;
                         await startVoteResponsesListener(voteId);
@@ -1336,7 +1383,11 @@ function renderDonutViz(t, opts = {}){
                     }
                 }
                 if (e.target.classList.contains('vote-visible-toggle')) {
-                    await updateDoc(ref, { visible: e.target.checked });
+                    const isVisible = e.target.checked;
+                    const updateData = { visible: isVisible };
+                    // Pokud vypneme zobrazení, musíme vypnout i aktivitu
+                    if (!isVisible) updateData.active = false;
+                    await updateDoc(ref, updateData);
                 }
                 if (e.target.classList.contains('vote-secret-toggle')) {
                     await updateDoc(ref, { secret: e.target.checked });
@@ -1358,28 +1409,58 @@ function renderDonutViz(t, opts = {}){
             if (!voteId) return;
 
             if (e.target.closest('.delete-vote-btn')) {
-                try {
-                    // smažeme i responses (pro malé počty)
-                    const respSnap = await getDocs(query(voteResponsesRef(voteId)));
-                    const batch = writeBatch(db);
-                    respSnap.docs.forEach(d => batch.delete(d.ref));
-                    batch.delete(voteDocRef(voteId));
-                    await batch.commit();
-                    if (selectedVoteId === voteId) { selectedVoteId = null; voteResponses = []; }
-                } catch (err) {
-                    console.error(err);
-                    showModal('Nepodařilo se smazat hlasování.');
-                }
+                showConfirm('Opravdu chcete smazat toto hlasování? Tato akce je nevratná.', async () => {
+                    try {
+                        const respSnap = await getDocs(query(voteResponsesRef(voteId)));
+                        const batch = writeBatch(db);
+                        respSnap.docs.forEach(d => batch.delete(d.ref));
+                        batch.delete(voteDocRef(voteId));
+                        await batch.commit();
+                        if (selectedVoteId === voteId) { selectedVoteId = null; voteResponses = []; }
+                        if (openDetailVoteId === voteId) openDetailVoteId = null;
+                    } catch (err) {
+                        console.error(err);
+                        showModal('Nepodařilo se smazat hlasování.');
+                    }
+                });
                 return;
             }
+
+            if (e.target.closest('.reset-vote-btn')) {
+                showConfirm('Opravdu chcete resetovat toto hlasování? Všechny odevzdané hlasy budou smazány.', async () => {
+                    try {
+                        const respSnap = await getDocs(query(voteResponsesRef(voteId)));
+                        const batch = writeBatch(db);
+                        respSnap.docs.forEach(d => batch.delete(d.ref));
+                        await batch.commit();
+                        if (selectedVoteId === voteId) { voteResponses = []; renderVoting(); }
+                        refreshVoteCounts();
+                        showModal('Hlasování bylo resetováno.');
+                    } catch (err) {
+                        console.error(err);
+                        showModal('Nepodařilo se resetovat hlasování.');
+                    }
+                });
+                return;
+            }
+
 	            // Detaily
 	            if (e.target.closest('.open-vote-details-btn')) {
-	                await renderVoteDetails(card);
+                    if (openDetailVoteId === voteId) {
+                        openDetailVoteId = null;
+                        renderVotesAdmin();
+                    } else {
+                        openDetailVoteId = voteId;
+                        renderVotesAdmin();
+                        // Po renderu musíme ještě načíst detaily pro ten nový card
+                        const newCard = ui.votesAdminList.querySelector(`[data-vote-id="${voteId}"]`);
+                        if (newCard) await renderVoteDetails(newCard);
+                    }
 	                return;
 	            }
 	            if (e.target.closest('.close-vote-details-btn')) {
-	                const details = card.querySelector('.vote-details');
-	                if (details) details.classList.add('hidden');
+                    openDetailVoteId = null;
+                    renderVotesAdmin();
 	                return;
 	            }
 	            // Smazat jednotlivý hlas (v detailech)
