@@ -8,7 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <style>
-        html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; }
+        html, body { height: 100%; margin: 0; padding: 0; overflow: auto; -webkit-overflow-scrolling: touch; }
         body { font-family: 'Inter', sans-serif; display: flex; flex-direction: column; }
         #app { width: 100%; max-width: 1400px; margin-left: auto; margin-right: auto; padding: 1rem; flex-grow: 1; display: flex; flex-direction: column; min-height: 0; }
         .view { display: none; flex-grow: 1; min-height: 0; }
@@ -36,6 +36,18 @@
         body.fullscreen #fullscreen-btn { display: none; }
         .collapsible-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-in-out; }
         .collapsible-content:not(.hidden) { max-height: 1000px; /* Adjust as needed */ }
+
+        /* Mobile/scroll fixes */
+        #main-content { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        .view { overflow-y: auto; }
+        .active-view { overflow-y: auto; }
+        #auth-section { max-height: calc(100vh - 2rem); overflow-y: auto; }
+        @media (max-width: 768px) {
+          #app { padding: 0.75rem; }
+          #presenter-view, #speaker-view, #voting-view, #admin-view { padding: 1rem; }
+          #main-header { margin-bottom: 0.75rem; }
+          #speaker-view { align-items: stretch !important; justify-content: flex-start !important; }
+        }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800">
@@ -175,7 +187,7 @@
 	                                        <i class="fa-solid fa-expand mr-2"></i>Celá obrazovka
 	                                    </button>
 	                                </div>
-	                                <div id="vote-viz" class="flex-grow min-h-0 overflow-hidden"></div>
+	                                <div id="vote-viz" class="flex-grow min-h-[180px] md:min-h-[240px] overflow-hidden"></div>
 	                            </div>
                         </div>
 
@@ -549,29 +561,40 @@
             const pct = (c) => total > 0 ? (c/total)*100 : 0;
             return { yes, no, abstain, cast: responses.length, total, yesPct: pct(yes), noPct: pct(no), abstainPct: pct(abstain) };
         }
-
         function renderBarsViz(t, opts = {}){
             const rows = [
                 { label: 'ANO', count: t.yes, pct: t.yesPct, cls: 'bg-green-600' },
                 { label: 'NE', count: t.no, pct: t.noPct, cls: 'bg-red-600' },
                 { label: 'Zdržel se', count: t.abstain, pct: t.abstainPct, cls: 'bg-gray-600' },
             ];
-            const barH = opts.barH || "h-3";
+
+            const barPx = Number(opts.barPx);
+            const barHClass = opts.barH || 'h-3';
+            const usePx = Number.isFinite(barPx) && barPx > 0;
+
+            const wrapClass = opts.fullscreen ? 'w-full max-w-4xl' : 'w-full';
             return `
-                <div class="space-y-3">
-                    ${rows.map(r => `
-                        <div>
-                            <div class="flex justify-between text-sm mb-1"><span class="font-semibold">${r.label}</span><span>${r.count} (${formatPct(r.pct)}%)</span></div>
-                            <div class="w-full bg-gray-200 rounded-full ${barH} overflow-hidden">
-                                <div class="${r.cls} ${barH}" style="width:${Math.min(100, Math.max(0, r.pct)).toFixed(2)}%"></div>
+                <div class="${wrapClass} space-y-4">
+                    ${rows.map(r => {
+                        const hClass = usePx ? '' : barHClass;
+                        const hStyle = usePx ? `height:${Math.round(barPx)}px;` : '';
+                        return `
+                            <div>
+                                <div class="flex justify-between text-sm md:text-base mb-2">
+                                    <span class="font-semibold">${r.label}</span>
+                                    <span>${r.count} (${formatPct(r.pct)}%)</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full overflow-hidden ${hClass}" style="${hStyle}">
+                                    <div class="${r.cls} ${hClass}" style="width:${Math.min(100, Math.max(0, r.pct)).toFixed(2)}%;${hStyle}"></div>
+                                </div>
                             </div>
-                        </div>
-                    `).join('')}
+                        `;
+                    }).join('')}
                 </div>
             `;
         }
 
-        function renderDonutViz(t, opts = {}){
+function renderDonutViz(t, opts = {}){
             const size = opts.size || 180;
             const r = opts.r || Math.round(size * 0.39);
             const c = 2 * Math.PI * r;
@@ -613,10 +636,16 @@
                 ...Array(abstainCells).fill('bg-gray-600'),
                 ...Array(rest).fill('bg-gray-200'),
             ].slice(0, totalCells);
+
+            // Backwards compatible: either Tailwind class (cellClass) or pixel size (cellPx)
+            const cellClass = opts.cellClass || 'w-3 h-3';
+            const cellPx = Number.isFinite(opts.cellPx) ? Math.max(4, opts.cellPx) : null;
+            const cellStyle = cellPx ? `style="width:${cellPx}px;height:${cellPx}px"` : '';
+
             return `
-                <div class="flex flex-col items-center">
+                <div class="w-full ${opts.fullscreen ? 'h-full flex items-center justify-center' : 'flex flex-col items-center'}">
                     <div class="grid grid-cols-10 gap-1">
-                        ${cells.map(cls => `<div class="${opts.cellClass || "w-3 h-3"} rounded-sm ${cls}"></div>`).join('')}
+                        ${cells.map(cls => `<div class="${cellPx ? '' : cellClass} rounded-sm ${cls}" ${cellStyle}></div>`).join('')}
                     </div>
                     <div class="mt-3 text-xs text-gray-500">100 dílků = 100% z nastaveného počtu</div>
                 </div>
@@ -626,19 +655,36 @@
         function renderVoteVisualizationInto(targetEl, opts = {}){
             const vote = votes.find(v => v.id === selectedVoteId) || getActiveVote();
             if (!vote) { if (targetEl) targetEl.innerHTML = ''; return; }
+
+            // Auto-size for bars/grid based on available space (especially fullscreen + mobile)
+            const w = (targetEl?.clientWidth || 0);
+            const h = (targetEl?.clientHeight || 0);
+            const fullscreen = !!opts.fullscreen;
+
+            const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+            const autoBarPx = (h > 0) ? clamp(Math.floor(h / (fullscreen ? 10 : 14)), fullscreen ? 14 : 10, fullscreen ? 44 : 22) : null;
+            const autoCellPx = (w > 0 && h > 0) ? clamp(Math.floor(Math.min(w, h) / (fullscreen ? 14 : 18)), fullscreen ? 8 : 6, fullscreen ? 42 : 18) : null;
+
             const t = computeTallies(vote.totalMembers, voteResponses);
 
             const wrap = (html) => {
-                // fullscreen: center and let it scale
-                if (opts.fullscreen) {
+                if (fullscreen) {
                     return `<div class="w-full h-full flex items-center justify-center">${html}</div>`;
                 }
                 return html;
             };
 
-            if (voteStyle === 'donut') targetEl.innerHTML = wrap(renderDonutViz(t, opts));
-            else if (voteStyle === 'grid') targetEl.innerHTML = wrap(renderGridViz(t, opts));
-            else targetEl.innerHTML = wrap(renderBarsViz(t, opts));
+            if (voteStyle === 'donut') {
+                targetEl.innerHTML = wrap(renderDonutViz(t, opts));
+            } else if (voteStyle === 'grid') {
+                const o = { ...opts };
+                if (!Number.isFinite(o.cellPx)) o.cellPx = autoCellPx;
+                targetEl.innerHTML = wrap(renderGridViz(t, o));
+            } else {
+                const o = { ...opts };
+                if (!Number.isFinite(o.barPx)) o.barPx = autoBarPx;
+                targetEl.innerHTML = wrap(renderBarsViz(t, o));
+            }
         }
 
         function renderVoteVisualization(){
@@ -783,12 +829,11 @@
 	                const donutSize = Math.max(240, Math.min(560, Math.min(w, h) - 40));
 	                const cellClass = (Math.min(w, h) >= 520) ? 'w-5 h-5' : 'w-4 h-4';
 	                renderVoteVisualizationInto(ui.voteFullscreenViz, {
-	                    fullscreen: true,
-	                    size: donutSize,
-	                    stroke: (donutSize >= 420 ? 22 : 18),
-	                    barH: (h >= 420 ? 'h-5' : 'h-4'),
-	                    cellClass,
-	                });
+                        fullscreen: true,
+                        size: donutSize,
+                        stroke: (donutSize >= 420 ? 22 : 18),
+                        // bars/grid will auto-size from container; donut uses size/stroke
+                    });
 	            }
 
 	            // Public (named) list in fullscreen for public votes
