@@ -666,7 +666,6 @@ function renderDonutViz(t, opts = {}){
                     <div class="grid grid-cols-10 gap-1">
                         ${cells.map(cls => `<div class="${cellPx ? '' : cellClass} rounded-sm ${cls}" ${cellStyle}></div>`).join('')}
                     </div>
-                    <div class="mt-3 text-xs text-gray-500">100 dílků = 100% z nastaveného počtu</div>
                 </div>
             `;
         }
