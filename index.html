@@ -1387,10 +1387,10 @@ function renderDonutViz(t, opts = {}){
 
                 isAdmin = settings.admins?.includes(currentUser?.email) ?? false;
                 setUiForAdmin(isAdmin);
-	                startVotesListener();
 
-                // (Re)start votes listener if admin status changed or if it hasn't started yet.
+                // (Re)start listeners if admin status changed or if they haven't started yet.
                 startVotesListener();
+                startHistoryListener();
 
                 renderSettings(settings);
                 renderQueue(currentQueue); // re-render s novým nastavením
