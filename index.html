@@ -1279,6 +1279,10 @@ function renderDonutViz(t, opts = {}){
         function renderReports() {
             if (!isAdmin) return;
             ui.reportsTableBody.innerHTML = '';
+            if (historyData.length === 0) {
+                ui.reportsTableBody.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center text-gray-500 italic">Žádná data v historii.</td></tr>';
+                return;
+            }
             historyData.sort((a,b) => (a.googleName || '').localeCompare(b.googleName || '')).forEach(user => {
                 const tr = document.createElement('tr');
                 const contributions = Object.entries(user.contributions || {})
@@ -1449,6 +1453,9 @@ function renderDonutViz(t, opts = {}){
                     renderReports();
                 }, (err) => {
                     console.error('History listener error:', err);
+                    if (err.message.includes("permission")) {
+                         ui.reportsTableBody.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center text-red-600 font-bold">Chyba oprávnění: Kolekce "history" není přístupná. Upravte Firestore Rules.</td></tr>';
+                    }
                 });
             };
 
@@ -1494,22 +1501,52 @@ function renderDonutViz(t, opts = {}){
         ui.logoutBtn.addEventListener('click',()=>signOut(auth));
         
         ui.navBtns.forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.view)));
-        ui.signupBtn.addEventListener('click',async()=>{try{const name=ui.speakerNameInput.value.trim();if(!name) throw new Error("Jméno nesmí být prázdné.");localStorage.setItem('parliamentSpeakerName',name);const isDuplicate=currentQueue.some(s=>s.name.toLowerCase()===name.toLowerCase()&&s.type===selectedContribution);if(isDuplicate){throw new Error(`Řečník <b>${name}</b> je již přihlášen s tímto typem příspěvku.`);}await runTransaction(db,async t=>{const c=await t.get(configDocRef);const typeSetting=dbState.settings?.types.find(s=>s.name===selectedContribution);if(typeSetting?.maxSignups!=null){const qSnap=await getDocs(query(queueRef,where("type","==",selectedContribution)));if(qSnap.size>=typeSetting.maxSignups)throw new Error(`Byl dosažen maximální počet přihlášek pro tento typ.`);}const qDocs = await getDocs(query(queueRef)); if(qDocs.empty&&!c.data().state.currentSpeaker){const n=typeSetting?.time??0;t.update(configDocRef,{"state.currentSpeaker":{name,type:selectedContribution,party:selectedParty},"state.timer":{timeRemaining:n,totalTime:n,isRunning:false}})}else{await addDoc(queueRef, {name,type:selectedContribution,party:selectedParty,timestamp:new Date()})}});
+        ui.signupBtn.addEventListener('click',async()=>{try{const name=ui.speakerNameInput.value.trim();if(!name) throw new Error("Jméno nesmí být prázdné.");localStorage.setItem('parliamentSpeakerName',name);const isDuplicate=currentQueue.some(s=>s.name.toLowerCase()===name.toLowerCase()&&s.type===selectedContribution);if(isDuplicate){throw new Error(`Řečník <b>${name}</b> je již přihlášen s tímto typem příspěvku.`);}
 
-        // Update history
-        const historyDocRef = doc(db, "artifacts", appId, "public", "data", "history", currentUser.uid);
-        const historyUpdate = {
-            googleName: currentUser.displayName || currentUser.email,
-            userNames: arrayUnion(name),
-            totalCount: increment(1),
-            [`contributions.${selectedContribution}`]: increment(1)
-        };
-        if (selectedParty) {
-            historyUpdate.parties = arrayUnion(selectedParty);
-        }
-        await setDoc(historyDocRef, historyUpdate, { merge: true });
+        await runTransaction(db,async t=>{
+            const c=await t.get(configDocRef);
+            const typeSetting=dbState.settings?.types.find(s=>s.name===selectedContribution);
 
-        showModal("Úspěšně přihlášen/a.");ui.speakerNameInput.value=localStorage.getItem('parliamentSpeakerName')||currentUser.displayName||'';switchView('presenter');}catch(e){showModal(e.message||"Přihlášení selhalo.")}});
+            if(typeSetting?.maxSignups!=null){
+                const qSnap=await getDocs(query(queueRef,where("type","==",selectedContribution)));
+                if(qSnap.size>=typeSetting.maxSignups)throw new Error(`Byl dosažen maximální počet přihlášek pro tento typ.`);
+            }
+
+            // Signup
+            const qDocs = await getDocs(query(queueRef));
+            if(qDocs.empty&&!c.data().state.currentSpeaker){
+                const n=typeSetting?.time??0;
+                t.update(configDocRef,{"state.currentSpeaker":{name,type:selectedContribution,party:selectedParty},"state.timer":{timeRemaining:n,totalTime:n,isRunning:false}});
+            }else{
+                const newSpeakerRef = doc(queueRef);
+                t.set(newSpeakerRef, {name,type:selectedContribution,party:selectedParty,timestamp:serverTimestamp()});
+            }
+
+            // History Update (Atomic)
+            const hDocRef = doc(db, "artifacts", appId, "public", "data", "history", currentUser.uid);
+            const hSnap = await t.get(hDocRef);
+            let hData = hSnap.exists() ? hSnap.data() : {
+                googleName: currentUser.displayName || currentUser.email,
+                userNames: [],
+                parties: [],
+                contributions: {},
+                totalCount: 0
+            };
+
+            if (!hData.userNames.includes(name)) hData.userNames.push(name);
+            if (selectedParty && !hData.parties.includes(selectedParty)) hData.parties.push(selectedParty);
+            hData.totalCount = (hData.totalCount || 0) + 1;
+            hData.contributions[selectedContribution] = (hData.contributions[selectedContribution] || 0) + 1;
+            hData.googleName = currentUser.displayName || currentUser.email;
+
+            t.set(hDocRef, hData, { merge: true });
+        });
+
+        showModal("Úspěšně přihlášen/a.");ui.speakerNameInput.value=localStorage.getItem('parliamentSpeakerName')||currentUser.displayName||'';switchView('presenter');}catch(e){
+            let errorMsg = e.message || "Přihlášení selhalo.";
+            if (errorMsg.includes("permission")) errorMsg += "<br><br><b>Tip pro administrátora:</b> Je potřeba povolit zápis do kolekce 'history' v Firestore Rules.";
+            showModal(errorMsg);
+        }});
         
         const handleTileSelection=(container,value,isParty)=>{if(isParty){selectedParty=value; if(value !== null) localStorage.setItem('parliamentPartyName',value);}else{selectedContribution=value;}[...container.children].forEach(t=>t.classList.toggle('selected',t.dataset.name===value));updateSignupButtonState();};
         ui.partyTiles.addEventListener('click',e=>{if(e.target.matches('.tile'))handleTileSelection(ui.partyTiles,e.target.dataset.name,true)});
