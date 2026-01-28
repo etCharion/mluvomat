@@ -85,8 +85,8 @@
                         <button data-view="presenter" class="nav-btn px-3 py-2 rounded-md text-gray-700 hover:bg-blue-100">Prezentace</button>
                         <button data-view="speaker" class="nav-btn px-3 py-2 rounded-md text-gray-700 hover:bg-blue-100">Přihlášení</button>
                         <button data-view="voting" id="voting-nav-btn" class="nav-btn px-3 py-2 rounded-md text-gray-700 hover:bg-blue-100 hidden">Hlasování</button>
-                        <button data-view="reports" id="reports-nav-btn" class="nav-btn px-3 py-2 rounded-md text-gray-700 hover:bg-blue-100 hidden">Přehledy</button>
-                        <button data-view="admin" id="admin-nav-btn" class="nav-btn px-3 py-2 rounded-md text-gray-700 hover:bg-blue-100 hidden">Administrace</button>
+                        <button data-view="reports" id="reports-nav-btn" class="admin-only nav-btn px-3 py-2 rounded-md text-gray-700 hover:bg-blue-100 hidden">Přehledy</button>
+                        <button data-view="admin" id="admin-nav-btn" class="admin-only nav-btn px-3 py-2 rounded-md text-gray-700 hover:bg-blue-100 hidden">Administrace</button>
                         <button id="logout-btn" class="ml-2 px-3 py-2 rounded-md text-red-600 hover:bg-red-100" title="Odhlásit se"><i class="fa-solid fa-right-from-bracket"></i></button>
                     </nav>
                 </div>
@@ -1541,6 +1541,10 @@ function renderDonutViz(t, opts = {}){
                 contributions: {},
                 totalCount: 0
             };
+
+            if (!hData.userNames) hData.userNames = [];
+            if (!hData.parties) hData.parties = [];
+            if (!hData.contributions) hData.contributions = {};
 
             if (!hData.userNames.includes(name)) hData.userNames.push(name);
             if (selectedParty && !hData.parties.includes(selectedParty)) hData.parties.push(selectedParty);
