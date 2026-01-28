@@ -1504,17 +1504,28 @@ function renderDonutViz(t, opts = {}){
         ui.signupBtn.addEventListener('click',async()=>{try{const name=ui.speakerNameInput.value.trim();if(!name) throw new Error("Jméno nesmí být prázdné.");localStorage.setItem('parliamentSpeakerName',name);const isDuplicate=currentQueue.some(s=>s.name.toLowerCase()===name.toLowerCase()&&s.type===selectedContribution);if(isDuplicate){throw new Error(`Řečník <b>${name}</b> je již přihlášen s tímto typem příspěvku.`);}
 
         await runTransaction(db,async t=>{
-            const c=await t.get(configDocRef);
-            const typeSetting=dbState.settings?.types.find(s=>s.name===selectedContribution);
+            // 1. Všechny TRANSAKČNÍ čtení musí být na začátku (t.get)
+            const hDocRef = doc(db, "artifacts", appId, "public", "data", "history", currentUser.uid);
+            const [configSnap, hSnap] = await Promise.all([t.get(configDocRef), t.get(hDocRef)]);
 
+            // 2. Ostatní čtení (getDocs - nejsou součástí atomické izolace transakce, ale musí proběhnout před zápisy)
+            const typeSetting=dbState.settings?.types.find(s=>s.name===selectedContribution);
+            let qSnapSize = 0;
             if(typeSetting?.maxSignups!=null){
                 const qSnap=await getDocs(query(queueRef,where("type","==",selectedContribution)));
-                if(qSnap.size>=typeSetting.maxSignups)throw new Error(`Byl dosažen maximální počet přihlášek pro tento typ.`);
+                qSnapSize = qSnap.size;
+            }
+            const qDocs = await getDocs(query(queueRef));
+
+            // 3. Logika a kontroly
+            if(typeSetting?.maxSignups!=null && qSnapSize >= typeSetting.maxSignups){
+                throw new Error(`Byl dosažen maximální počet přihlášek pro tento typ.`);
             }
 
-            // Signup
-            const qDocs = await getDocs(query(queueRef));
-            if(qDocs.empty&&!c.data().state.currentSpeaker){
+            // 4. Všechny zápisy musí být na konci (t.set, t.update)
+
+            // Přihlášení (do pořadníku)
+            if(qDocs.empty && !configSnap.data().state.currentSpeaker){
                 const n=typeSetting?.time??0;
                 t.update(configDocRef,{"state.currentSpeaker":{name,type:selectedContribution,party:selectedParty},"state.timer":{timeRemaining:n,totalTime:n,isRunning:false}});
             }else{
@@ -1522,9 +1533,7 @@ function renderDonutViz(t, opts = {}){
                 t.set(newSpeakerRef, {name,type:selectedContribution,party:selectedParty,timestamp:serverTimestamp()});
             }
 
-            // History Update (Atomic)
-            const hDocRef = doc(db, "artifacts", appId, "public", "data", "history", currentUser.uid);
-            const hSnap = await t.get(hDocRef);
+            // Historie (agregace)
             let hData = hSnap.exists() ? hSnap.data() : {
                 googleName: currentUser.displayName || currentUser.email,
                 userNames: [],
