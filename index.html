@@ -1278,6 +1278,7 @@ function renderDonutViz(t, opts = {}){
 
         function renderReports() {
             if (!isAdmin) return;
+            console.log('Rendering reports, records:', historyData.length);
             ui.reportsTableBody.innerHTML = '';
             if (historyData.length === 0) {
                 ui.reportsTableBody.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center text-gray-500 italic">Žádná data v historii.</td></tr>';
@@ -1379,6 +1380,21 @@ function renderDonutViz(t, opts = {}){
                     showModal('Chyba načítání hlasování: ' + (err?.message || err));
                 });
             };
+
+            const startHistoryListener = () => {
+                if (!isAdmin) return;
+                if (unsubscribeHistory) unsubscribeHistory();
+                unsubscribeHistory = onSnapshot(historyRef, (snap) => {
+                    historyData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                    console.log('History updated:', historyData.length, 'records');
+                    renderReports();
+                }, (err) => {
+                    console.error('History listener error:', err);
+                    if (err.message.includes("permission")) {
+                         ui.reportsTableBody.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center text-red-600 font-bold">Chyba oprávnění: Kolekce "history" není přístupná. Upravte Firestore Rules.</td></tr>';
+                    }
+                });
+            };
             
             unsubscribeConfig = onSnapshot(configDocRef, (doc) => {
                 if (!doc.exists()) return;
@@ -1443,21 +1459,6 @@ function renderDonutViz(t, opts = {}){
                 console.error('Queue listener error:', err);
                 showModal('Chyba načítání (queue): ' + (err?.message || err));
             });
-
-            // Start history listener (only if admin)
-            const startHistoryListener = () => {
-                if (!isAdmin) return;
-                if (unsubscribeHistory) unsubscribeHistory();
-                unsubscribeHistory = onSnapshot(historyRef, (snap) => {
-                    historyData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                    renderReports();
-                }, (err) => {
-                    console.error('History listener error:', err);
-                    if (err.message.includes("permission")) {
-                         ui.reportsTableBody.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center text-red-600 font-bold">Chyba oprávnění: Kolekce "history" není přístupná. Upravte Firestore Rules.</td></tr>';
-                    }
-                });
-            };
 
             // Start votes listener in "user" mode immediately; it will auto-upgrade for admin after config arrives.
             startVotesListener();
