@@ -48,6 +48,17 @@
           #main-header { margin-bottom: 0.75rem; }
           #speaker-view { align-items: stretch !important; justify-content: flex-start !important; }
         }
+        @media print {
+            body { background-color: white !important; color: black !important; }
+            #main-header, .no-print, nav, button, #logout-btn, .nav-btn { display: none !important; }
+            #app { max-width: none !important; margin: 0 !important; padding: 0 !important; }
+            #main-content { display: block !important; overflow: visible !important; }
+            .view { display: none !important; }
+            #reports-view { display: block !important; padding: 0 !important; margin: 0 !important; box-shadow: none !important; }
+            table { width: 100% !important; border-collapse: collapse !important; }
+            th, td { border: 1px solid #e5e7eb !important; padding: 0.5rem !important; text-align: left !important; font-size: 0.875rem !important; }
+            thead { background-color: #f9fafb !important; }
+        }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800">
@@ -74,7 +85,8 @@
                         <button data-view="presenter" class="nav-btn px-3 py-2 rounded-md text-gray-700 hover:bg-blue-100">Prezentace</button>
                         <button data-view="speaker" class="nav-btn px-3 py-2 rounded-md text-gray-700 hover:bg-blue-100">Přihlášení</button>
                         <button data-view="voting" id="voting-nav-btn" class="nav-btn px-3 py-2 rounded-md text-gray-700 hover:bg-blue-100 hidden">Hlasování</button>
-<button data-view="admin" id="admin-nav-btn" class="nav-btn px-3 py-2 rounded-md text-gray-700 hover:bg-blue-100 hidden">Administrace</button>
+                        <button data-view="reports" id="reports-nav-btn" class="nav-btn px-3 py-2 rounded-md text-gray-700 hover:bg-blue-100 hidden">Přehledy</button>
+                        <button data-view="admin" id="admin-nav-btn" class="nav-btn px-3 py-2 rounded-md text-gray-700 hover:bg-blue-100 hidden">Administrace</button>
                         <button id="logout-btn" class="ml-2 px-3 py-2 rounded-md text-red-600 hover:bg-red-100" title="Odhlásit se"><i class="fa-solid fa-right-from-bracket"></i></button>
                     </nav>
                 </div>
@@ -283,9 +295,70 @@
                     </div>
                 </div>
             </div>
+            <!-- Reports View -->
+            <div id="reports-view" class="view p-4 bg-white rounded-lg shadow-md flex-grow">
+                <div class="flex justify-between items-center mb-4 flex-wrap gap-4">
+                    <h2 class="text-2xl font-bold">Přehledy přihlašování</h2>
+                    <div class="flex gap-2 no-print">
+                        <button id="print-reports-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
+                            <i class="fa-solid fa-print mr-2"></i>Tisk
+                        </button>
+                        <button id="reset-history-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">
+                            <i class="fa-solid fa-trash-can mr-2"></i>Reset
+                        </button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Google Jméno</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Uživatelská Jména</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Strany</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Typy Příspěvků</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Celkem</th>
+                                <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider no-print">Akce</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reports-table-body" class="bg-white divide-y divide-gray-200">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
         <div id="message-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"><div class="bg-white rounded-lg shadow-xl p-8 max-w-lg text-center"><p id="modal-text" class="mb-6 text-base text-left"></p><div class="flex justify-end gap-4"><button id="modal-close-btn" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded-lg">OK</button></div></div></div>
         <div id="confirm-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"><div class="bg-white rounded-lg shadow-xl p-8 max-w-lg text-center"><p id="confirm-modal-text" class="mb-6 text-base text-left"></p><div class="flex justify-end gap-4"><button id="confirm-modal-cancel-btn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-6 rounded-lg">Zrušit</button><button id="confirm-modal-ok-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg">Potvrdit</button></div></div></div>
+        <div id="edit-report-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div class="bg-white rounded-lg shadow-xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                <h2 class="text-xl font-bold mb-4">Upravit záznam</h2>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Google Jméno</label>
+                        <input type="text" id="edit-google-name" class="mt-1 block w-full border rounded-md shadow-sm p-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Uživatelská Jména (jedno na řádek)</label>
+                        <textarea id="edit-user-names" rows="3" class="mt-1 block w-full border rounded-md shadow-sm p-2"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Strany (jedna na řádek)</label>
+                        <textarea id="edit-parties" rows="3" class="mt-1 block w-full border rounded-md shadow-sm p-2"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 font-bold">Počty příspěvků</label>
+                        <div id="edit-contributions-list" class="space-y-2 mt-2">
+                        </div>
+                    </div>
+                </div>
+                <div class="flex flex-wrap justify-between mt-6 pt-4 border-t gap-4">
+                    <button id="delete-report-row-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Smazat celý řádek</button>
+                    <div class="flex gap-3">
+                        <button id="edit-report-cancel-btn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg">Zrušit</button>
+                        <button id="edit-report-save-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Uložit</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
 	    <!-- Vote Fullscreen Overlay (admin) -->
@@ -359,7 +432,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, addDoc, deleteDoc, runTransaction, updateDoc, query, getDocs, where, writeBatch, orderBy, serverTimestamp, getCountFromServer } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, addDoc, deleteDoc, runTransaction, updateDoc, query, getDocs, where, writeBatch, orderBy, serverTimestamp, getCountFromServer, arrayUnion, increment } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Basic Setup ---
         const firebaseConfig = {
@@ -381,13 +454,15 @@
         const configDocRef = doc(db, "artifacts", appId, "public", "data", "config", "main");
         const queueRef = collection(db, "artifacts", appId, "public", "data", "queue");
         const votesRef = collection(db, "artifacts", appId, "public", "data", "votes");
+        const historyRef = collection(db, "artifacts", appId, "public", "data", "history");
         
         // --- Global State ---
         let currentUser = null, isAdmin = false, timerInterval = null, timeRemaining = 0, totalTime = 0, isDraggingTimer = false, dbState = {};
         let selectedParty = null, selectedContribution = null, currentQueue = [];
         let votes = [], selectedVoteId = null, voteStyle = 'bars';
         let voteResponses = [], myVote = null;
-        let unsubscribeConfig, unsubscribeQueue, unsubscribeVotes, unsubscribeVoteResponses; // To hold listener unsub functions
+        let historyData = [], currentlyEditingUserId = null;
+        let unsubscribeConfig, unsubscribeQueue, unsubscribeVotes, unsubscribeVoteResponses, unsubscribeHistory; // To hold listener unsub functions
 
         // --- UI Element Query Selector ---
         const $ = (selector) => document.querySelector(selector);
@@ -395,7 +470,7 @@
         
         const ui = {
             authSection:$('#auth-section'),mainContent:$('#main-content'),userInfo:$('#user-info'),navBtns:$$('.nav-btn'),adminNavBtn:$('#admin-nav-btn'),logoutBtn:$('#logout-btn'),loginBtn:$('#login-btn'),
-            views:{presenter:$('#presenter-view'),speaker:$('#speaker-view'),voting:$('#voting-view'),admin:$('#admin-view')},
+            views:{presenter:$('#presenter-view'),speaker:$('#speaker-view'),voting:$('#voting-view'),admin:$('#admin-view'),reports:$('#reports-view')},
             speakerNameInput:$('#speaker-name'),partyTiles:$('#party-tiles'),contributionTiles:$('#contribution-tiles'),signupBtn:$('#signup-btn'),
             adminSpeakerList:$('#admin-speaker-list'),nextSpeakerBtn:$('#next-speaker-btn'),settingsList:$('#settings-list'),
             newSettingName:$('#new-setting-name'),newSettingTime:$('#new-setting-time'),newSettingColor:$('#new-setting-color'),addSettingBtn:$('#add-setting-btn'),
@@ -412,6 +487,7 @@
             qrToggleBtn: $('#qr-toggle-btn'), qrContainer: $('#qr-container'),
             adminsList: $('#admins-list'), newAdminEmail: $('#new-admin-email'), addAdminBtn: $('#add-admin-btn'),
             votingNavBtn: $('#voting-nav-btn'),
+            reportsNavBtn: $('#reports-nav-btn'),
             votingHiddenMessage: $('#voting-hidden-message'),
             votingPanel: $('#voting-panel'),
             votingTopic: $('#voting-topic'),
@@ -445,6 +521,17 @@
             pastVotes: $('#past-votes'),
             newVoteTopic: $('#new-vote-topic'), newVoteTotal: $('#new-vote-total'), addVoteBtn: $('#add-vote-btn'),
             votesAdminList: $('#votes-admin-list'),
+            reportsTableBody: $('#reports-table-body'),
+            printReportsBtn: $('#print-reports-btn'),
+            resetHistoryBtn: $('#reset-history-btn'),
+            editReportModal: $('#edit-report-modal'),
+            editGoogleName: $('#edit-google-name'),
+            editUserNames: $('#edit-user-names'),
+            editParties: $('#edit-parties'),
+            editContributionsList: $('#edit-contributions-list'),
+            editReportSaveBtn: $('#edit-report-save-btn'),
+            editReportCancelBtn: $('#edit-report-cancel-btn'),
+            deleteReportRowBtn: $('#delete-report-row-btn'),
         };
         
         // --- Core Functions ---
@@ -1181,11 +1268,63 @@ function renderDonutViz(t, opts = {}){
         
         function setUiForAdmin(isAdminStatus) {
             ui.adminNavBtn.style.display = isAdminStatus ? 'inline-block' : 'none';
+            ui.reportsNavBtn.style.display = isAdminStatus ? 'inline-block' : 'none';
             ui.timerControls.style.display = isAdminStatus ? 'flex' : 'none';
             if (ui.voteFullscreenBtn) ui.voteFullscreenBtn.classList.toggle('hidden', !isAdminStatus);
             if (!isAdminStatus) { ui.timerDisplay.style.cursor = 'default'; isDraggingTimer = false; } 
             else { ui.timerDisplay.style.cursor = 'grab'; }
             document.body.classList.toggle('is-admin', isAdminStatus);
+        }
+
+        function renderReports() {
+            if (!isAdmin) return;
+            ui.reportsTableBody.innerHTML = '';
+            historyData.sort((a,b) => (a.googleName || '').localeCompare(b.googleName || '')).forEach(user => {
+                const tr = document.createElement('tr');
+                const contributions = Object.entries(user.contributions || {})
+                    .map(([type, count]) => `${type} (${count}x)`)
+                    .join(', ');
+
+                tr.innerHTML = `
+                    <td class="px-4 py-4 text-sm text-gray-900">${user.googleName || '-'}</td>
+                    <td class="px-4 py-4 text-sm text-gray-500">${(user.userNames || []).join(', ')}</td>
+                    <td class="px-4 py-4 text-sm text-gray-500">${(user.parties || []).join(', ')}</td>
+                    <td class="px-4 py-4 text-sm text-gray-500">${contributions}</td>
+                    <td class="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${user.totalCount || 0}</td>
+                    <td class="px-4 py-4 whitespace-nowrap text-right text-sm font-medium no-print">
+                        <button class="edit-report-btn text-blue-600 hover:text-blue-900" data-id="${user.id}"><i class="fa-solid fa-pen-to-square"></i></button>
+                    </td>
+                `;
+                ui.reportsTableBody.appendChild(tr);
+            });
+
+            ui.reportsTableBody.querySelectorAll('.edit-report-btn').forEach(btn => {
+                btn.addEventListener('click', () => openEditReportModal(btn.dataset.id));
+            });
+        }
+
+        function openEditReportModal(userId) {
+            const user = historyData.find(u => u.id === userId);
+            if (!user) return;
+            currentlyEditingUserId = userId;
+            ui.editGoogleName.value = user.googleName || '';
+            ui.editUserNames.value = (user.userNames || []).join('\n');
+            ui.editParties.value = (user.parties || []).join('\n');
+
+            ui.editContributionsList.innerHTML = '';
+            const allTypes = new Set([...(dbState.settings?.types || []).map(t => t.name), ...Object.keys(user.contributions || {})]);
+            Array.from(allTypes).sort().forEach(type => {
+                const count = user.contributions?.[type] || 0;
+                const div = document.createElement('div');
+                div.className = 'flex items-center justify-between gap-2 bg-gray-50 p-2 rounded';
+                div.innerHTML = `
+                    <span class="text-sm flex-grow">${type}</span>
+                    <input type="number" class="edit-contribution-input w-20 border rounded p-1" data-type="${type}" value="${count}" min="0">
+                `;
+                ui.editContributionsList.appendChild(div);
+            });
+
+            ui.editReportModal.classList.remove('hidden');
         }
 
         async function refreshVoteCounts() {
@@ -1204,6 +1343,7 @@ function renderDonutViz(t, opts = {}){
             if (unsubscribeQueue) unsubscribeQueue();
             if (unsubscribeVotes) unsubscribeVotes();
             if (unsubscribeVoteResponses) unsubscribeVoteResponses();
+            if (unsubscribeHistory) unsubscribeHistory();
 
             // Votes listener must be role-aware:
             // - Non-admins may only query votes with visible == true (otherwise the whole query is denied).
@@ -1300,8 +1440,21 @@ function renderDonutViz(t, opts = {}){
                 showModal('Chyba načítání (queue): ' + (err?.message || err));
             });
 
+            // Start history listener (only if admin)
+            const startHistoryListener = () => {
+                if (!isAdmin) return;
+                if (unsubscribeHistory) unsubscribeHistory();
+                unsubscribeHistory = onSnapshot(historyRef, (snap) => {
+                    historyData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                    renderReports();
+                }, (err) => {
+                    console.error('History listener error:', err);
+                });
+            };
+
             // Start votes listener in "user" mode immediately; it will auto-upgrade for admin after config arrives.
             startVotesListener();
+            startHistoryListener();
         }
         
         // --- OPRAVENÁ HLAVNÍ FUNKCE ---
@@ -1333,6 +1486,7 @@ function renderDonutViz(t, opts = {}){
                 if (unsubscribeQueue) unsubscribeQueue();
                 if (unsubscribeVotes) unsubscribeVotes();
                 if (unsubscribeVoteResponses) unsubscribeVoteResponses();
+                if (unsubscribeHistory) unsubscribeHistory();
             }
         });
         
@@ -1340,7 +1494,22 @@ function renderDonutViz(t, opts = {}){
         ui.logoutBtn.addEventListener('click',()=>signOut(auth));
         
         ui.navBtns.forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.view)));
-        ui.signupBtn.addEventListener('click',async()=>{try{const name=ui.speakerNameInput.value.trim();if(!name) throw new Error("Jméno nesmí být prázdné.");localStorage.setItem('parliamentSpeakerName',name);const isDuplicate=currentQueue.some(s=>s.name.toLowerCase()===name.toLowerCase()&&s.type===selectedContribution);if(isDuplicate){throw new Error(`Řečník <b>${name}</b> je již přihlášen s tímto typem příspěvku.`);}await runTransaction(db,async t=>{const c=await t.get(configDocRef);const typeSetting=dbState.settings?.types.find(s=>s.name===selectedContribution);if(typeSetting?.maxSignups!=null){const qSnap=await getDocs(query(queueRef,where("type","==",selectedContribution)));if(qSnap.size>=typeSetting.maxSignups)throw new Error(`Byl dosažen maximální počet přihlášek pro tento typ.`);}const qDocs = await getDocs(query(queueRef)); if(qDocs.empty&&!c.data().state.currentSpeaker){const n=typeSetting?.time??0;t.update(configDocRef,{"state.currentSpeaker":{name,type:selectedContribution,party:selectedParty},"state.timer":{timeRemaining:n,totalTime:n,isRunning:false}})}else{await addDoc(queueRef, {name,type:selectedContribution,party:selectedParty,timestamp:new Date()})}});showModal("Úspěšně přihlášen/a.");ui.speakerNameInput.value=localStorage.getItem('parliamentSpeakerName')||currentUser.displayName||'';switchView('presenter');}catch(e){showModal(e.message||"Přihlášení selhalo.")}});
+        ui.signupBtn.addEventListener('click',async()=>{try{const name=ui.speakerNameInput.value.trim();if(!name) throw new Error("Jméno nesmí být prázdné.");localStorage.setItem('parliamentSpeakerName',name);const isDuplicate=currentQueue.some(s=>s.name.toLowerCase()===name.toLowerCase()&&s.type===selectedContribution);if(isDuplicate){throw new Error(`Řečník <b>${name}</b> je již přihlášen s tímto typem příspěvku.`);}await runTransaction(db,async t=>{const c=await t.get(configDocRef);const typeSetting=dbState.settings?.types.find(s=>s.name===selectedContribution);if(typeSetting?.maxSignups!=null){const qSnap=await getDocs(query(queueRef,where("type","==",selectedContribution)));if(qSnap.size>=typeSetting.maxSignups)throw new Error(`Byl dosažen maximální počet přihlášek pro tento typ.`);}const qDocs = await getDocs(query(queueRef)); if(qDocs.empty&&!c.data().state.currentSpeaker){const n=typeSetting?.time??0;t.update(configDocRef,{"state.currentSpeaker":{name,type:selectedContribution,party:selectedParty},"state.timer":{timeRemaining:n,totalTime:n,isRunning:false}})}else{await addDoc(queueRef, {name,type:selectedContribution,party:selectedParty,timestamp:new Date()})}});
+
+        // Update history
+        const historyDocRef = doc(db, "artifacts", appId, "public", "data", "history", currentUser.uid);
+        const historyUpdate = {
+            googleName: currentUser.displayName || currentUser.email,
+            userNames: arrayUnion(name),
+            totalCount: increment(1),
+            [`contributions.${selectedContribution}`]: increment(1)
+        };
+        if (selectedParty) {
+            historyUpdate.parties = arrayUnion(selectedParty);
+        }
+        await setDoc(historyDocRef, historyUpdate, { merge: true });
+
+        showModal("Úspěšně přihlášen/a.");ui.speakerNameInput.value=localStorage.getItem('parliamentSpeakerName')||currentUser.displayName||'';switchView('presenter');}catch(e){showModal(e.message||"Přihlášení selhalo.")}});
         
         const handleTileSelection=(container,value,isParty)=>{if(isParty){selectedParty=value; if(value !== null) localStorage.setItem('parliamentPartyName',value);}else{selectedContribution=value;}[...container.children].forEach(t=>t.classList.toggle('selected',t.dataset.name===value));updateSignupButtonState();};
         ui.partyTiles.addEventListener('click',e=>{if(e.target.matches('.tile'))handleTileSelection(ui.partyTiles,e.target.dataset.name,true)});
@@ -1538,6 +1707,64 @@ function renderDonutViz(t, opts = {}){
         const startDrag=(e)=>{if(e.target.closest('#time-left') && totalTime>0&&isAdmin){isDraggingTimer=true;ui.timerDisplay.style.cursor='grabbing';if(dbState.state?.timer?.isRunning)updateDoc(configDocRef,{"state.timer.isRunning":false})}};
         const stopDrag=()=>{if(isDraggingTimer&&isAdmin){isDraggingTimer=false;ui.timerDisplay.style.cursor='grab';updateDoc(configDocRef,{"state.timer.timeRemaining":timeRemaining})}};
         ui.timerDisplay.addEventListener('mousedown',startDrag);document.addEventListener('mousemove',handleTimerDrag);document.addEventListener('mouseup',stopDrag);ui.timerDisplay.addEventListener('touchstart',startDrag,{passive:false});document.addEventListener('touchmove',handleTimerDrag,{passive:false});document.addEventListener('touchend',stopDrag);
+
+        ui.editReportSaveBtn.addEventListener('click', async () => {
+            if (!currentlyEditingUserId) return;
+            const contributions = {};
+            let totalCount = 0;
+            ui.editContributionsList.querySelectorAll('.edit-contribution-input').forEach(input => {
+                const count = parseInt(input.value) || 0;
+                contributions[input.dataset.type] = count;
+                totalCount += count;
+            });
+
+            const updatedData = {
+                googleName: ui.editGoogleName.value.trim(),
+                userNames: ui.editUserNames.value.split('\n').map(s => s.trim()).filter(Boolean),
+                parties: ui.editParties.value.split('\n').map(s => s.trim()).filter(Boolean),
+                contributions: contributions,
+                totalCount: totalCount
+            };
+
+            try {
+                await setDoc(doc(db, "artifacts", appId, "public", "data", "history", currentlyEditingUserId), updatedData);
+                ui.editReportModal.classList.add('hidden');
+            } catch (err) {
+                console.error(err);
+                showModal('Nepodařilo se uložit změny.');
+            }
+        });
+
+        ui.editReportCancelBtn.addEventListener('click', () => ui.editReportModal.classList.add('hidden'));
+
+        ui.deleteReportRowBtn.addEventListener('click', () => {
+            if (!currentlyEditingUserId) return;
+            showConfirm("Opravdu chcete smazat celý tento záznam?", async () => {
+                try {
+                    await deleteDoc(doc(db, "artifacts", appId, "public", "data", "history", currentlyEditingUserId));
+                    ui.editReportModal.classList.add('hidden');
+                } catch (err) {
+                    console.error(err);
+                    showModal('Nepodařilo se smazat záznam.');
+                }
+            });
+        });
+
+        ui.printReportsBtn.addEventListener('click', () => window.print());
+
+        ui.resetHistoryBtn.addEventListener('click', () => {
+            showConfirm("Opravdu chcete vymazat CELOU historii přihlašování? Tato akce je nevratná.", async () => {
+                try {
+                    const snap = await getDocs(historyRef);
+                    const batch = writeBatch(db);
+                    snap.docs.forEach(d => batch.delete(d.ref));
+                    await batch.commit();
+                } catch (err) {
+                    console.error(err);
+                    showModal('Nepodařilo se vymazat historii.');
+                }
+            });
+        });
     </script>
 </body>
 </html>
