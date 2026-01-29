@@ -1,37 +1,45 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Pravidla pro naši konkrétní aplikaci
     match /artifacts/{appId}/public/data {
 
-      function isAdmin(aId) {
+      // Funkce pro ověření, zda je uživatel administrátor
+      function isAdmin(appId) {
         return request.auth != null &&
-          request.auth.token.get('email', '') in get(/databases/$(database)/documents/artifacts/$(aId)/public/data/config/main).data.settings.admins;
+          get(/databases/$(database)/documents/artifacts/$(appId)/public/data/config/main).data.settings.admins.hasAny([request.auth.token.email]);
       }
 
+      // 1. Konfigurace (Seznam adminů, nastavení typů příspěvků)
       match /config/main {
         allow read: if request.auth != null;
         allow write: if isAdmin(appId);
       }
 
+      // 2. Pořadník (Fronta řečníků)
       match /queue/{doc=**} {
         allow read, create: if request.auth != null;
         allow update, delete: if isAdmin(appId);
       }
 
+      // 3. Hlasování
       match /votes/{voteId} {
         allow read: if request.auth != null;
         allow write: if isAdmin(appId);
 
+        // Odpovědi jednotlivých uživatelů v konkrétním hlasování
         match /responses/{userId} {
           allow read: if request.auth != null;
-          // Povoleno pro majitele hlasu NEBO administrátora
-          allow write: if request.auth != null && (request.auth.uid == userId || isAdmin(appId));
+          allow write: if request.auth != null && request.auth.uid == userId;
         }
       }
 
+      // 4. Historie (Přehledy / Reports)
       match /history/{userId} {
-        allow read: if request.auth != null && (request.auth.uid == userId || isAdmin(appId));
-        allow create, update: if request.auth != null && (request.auth.uid == userId || isAdmin(appId));
+        // Admin může vše.
+        // Uživatel může číst a aktualizovat svůj vlastní záznam (nutné pro počítání příspěvků).
+        allow read: if isAdmin(appId) || (request.auth != null && request.auth.uid == userId);
+        allow create, update: if isAdmin(appId) || (request.auth != null && request.auth.uid == userId);
         allow delete: if isAdmin(appId);
       }
     }
